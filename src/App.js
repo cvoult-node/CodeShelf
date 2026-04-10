@@ -191,17 +191,33 @@ function App() {
         ),
         React.createElement('button', { onClick: () => handleSaveFont(), className: "mt-6 w-full max-w-[450px] py-4 bg-cyan-600 rounded-xl font-bold" }, isSaving ? "GUARDANDO..." : "GUARDAR CAMBIOS")
       ),
-      React.createElement('aside', { className: "bg-neutral-900/50 p-6 rounded-3xl" },
-        React.createElement('div', { className: "grid grid-cols-4 gap-2" },
-          TECLADO.map(t => React.createElement('button', {
-            key: t, onClick: () => switchChar(t),
-            className: `h-12 rounded-lg border transition-all ${currentChar === t ? 'bg-white text-black' : 'border-white/5 text-neutral-500'}`
-          }, t))
-        )
+                        
+    React.createElement('aside', { className: "bg-neutral-900/80 border border-white/5 rounded-[2rem] p-6 backdrop-blur-xl" },
+      React.createElement('div', { className: "flex justify-between items-center mb-6" },
+        React.createElement('h3', { className: "text-[10px] font-black tracking-[0.2em] text-neutral-500 uppercase" }, "Mapa de Caracteres"),
+        React.createElement('button', { onClick: clearCanvas, className: "text-[10px] text-red-400 hover:bg-red-500/10 px-2 py-1 rounded" }, "LIMPIAR")
+      ),
+      React.createElement('div', { className: "grid grid-cols-4 gap-2 h-[65vh] overflow-y-auto pr-2 custom-scrollbar" },
+        TECLADO.map(t => {
+          const isConfigured = fontData[t] && fontData[t].some(p => p === true);
+          return React.createElement('button', {
+            key: t, 
+            onClick: () => switchChar(t),
+            className: `relative group h-14 rounded-xl border-2 transition-all flex items-center justify-center font-bold text-lg ${
+              currentChar === t 
+                ? 'bg-cyan-500 border-cyan-400 text-black shadow-[0_0_15px_rgba(6,182,212,0.4)]' 
+                : isConfigured 
+                  ? 'border-cyan-900/50 bg-cyan-900/10 text-cyan-400' 
+                  : 'border-white/5 bg-black/40 text-neutral-600 hover:border-white/20'
+            }`
+          }, 
+            t,
+            isConfigured && currentChar !== t && React.createElement('div', { 
+              className: "absolute top-1 right-1 w-1.5 h-1.5 bg-cyan-400 rounded-full" 
+            })
+          );
+        })
       )
     )
-  );
-}
-
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(React.createElement(App));
