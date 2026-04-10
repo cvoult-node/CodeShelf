@@ -15,6 +15,9 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showModal, setShowModal] = useState(false);
+  const [nuevoNombre, setNuevoNombre] = useState("");
+  const [nuevoSize, setNuevoSize] = useState(8);
   
   // ESTADOS DEL PROYECTO
   const [proyectos, setProyectos] = useState([]);
@@ -50,14 +53,33 @@ function App() {
   }, []);
 
   // 2. FUNCIONES DE GESTIÓN (Dashboard)
-  const crearProyecto = async (nombre, s) => {
-    const id = Date.now().toString();
-    const ref = doc(db, "usuarios", user.uid, "proyectos", id);
-    const inicial = { nombre, gridSize: s, font: {}, updatedAt: new Date() };
-    await setDoc(ref, inicial);
-    abrirProyecto({ id, ...inicial });
-    cargarProyectos(user);
-  };
+  const confirmarNuevoProyecto = async () => {
+      if (!nuevoNombre.trim()) return alert("Escribe un nombre para tu fuente");
+      
+      setIsSaving(true);
+      try {
+        const id = Date.now().toString();
+        const ref = doc(db, "usuarios", user.uid, "proyectos", id);
+        const inicial = { 
+          nombre: nuevoNombre, 
+          gridSize: nuevoSize, 
+          font: {}, 
+          updatedAt: new Date() 
+        };
+        
+        await setDoc(ref, inicial);
+        abrirProyecto({ id, ...inicial });
+        cargarProyectos(user);
+        
+        // Resetear y cerrar modal
+        setShowModal(false);
+        setNuevoNombre("");
+      } catch (e) {
+        alert("Error al crear el proyecto");
+      } finally {
+        setIsSaving(false);
+      }
+    };
 
   const eliminarProyecto = async (id) => {
     if (!confirm("¿Borrar proyecto?")) return;
