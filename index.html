@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    
+    <title>CodeShelf | Pixel Font Editor & Social</title>
+    <meta name="description" content="Diseña, guarda y comparte tus propias tipografías pixel art." />
+    <meta name="theme-color" content="#0a0a0a" />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&family=Press+Start+2P&display=swap" rel="stylesheet">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <script>
+      // Configuración de Tailwind para usar fuentes personalizadas
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['Inter', 'sans-serif'],
+              pixel: ['"Press Start 2P"', 'cursive'],
+            },
+            colors: {
+              cyan: {
+                400: '#22d3ee',
+                500: '#06b6d4',
+                600: '#0891b2',
+              }
+            }
+          }
+        }
+      }
+    </script>
+
+    <style type="text/css">
+      /* Scrollbar estilo "Gamer" */
+      ::-webkit-scrollbar {
+        width: 8px;
+      }
+      ::-webkit-scrollbar-track {
+        background: #0a0a0a;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #262626;
+        border-radius: 10px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #333;
+      }
+
+      /* Animación simple para el fondo */
+      body {
+        background-color: #0a0a0a;
+        background-image: radial-gradient(#1a1a1a 1px, transparent 1px);
+        background-size: 20px 20px;
+        color: #e5e5e5;
+        overflow-x: hidden;
+      }
+
+      /* Evita que el usuario seleccione texto en el grid de dibujo */
+      .no-select {
+        user-select: none;
+      }
+    </style>
+  </head>
+  
+  <body class="antialiased no-select">
+    
+    <div id="root"></div>
+
+    <script type="module" src="/src/App.jsx"></script>
+
+    <noscript>
+      <div style="text-align: center; padding: 50px;">
+        <h1>Necesitas activar JavaScript para usar CodeShelf.</h1>
+      </div>
+    </noscript>
+
+  </body>
+</html>
