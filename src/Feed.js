@@ -2,8 +2,10 @@
 //  SOCIAL FEED — src/Feed.js
 // ─────────────────────────────────────────────
 import React from 'https://esm.sh/react@18.2.0';
-// Importamos la función con alias para evitar conflictos y el objeto auth desde tu configuración
-import { signOut as SignOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+
+// 1. CORRECCIÓN: Importamos signOut directamente con su nombre original 
+// o nos aseguramos de usar el alias correctamente.
+import { signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import { auth } from './firebase.js'; 
 
 import { ACCENT, R_CARD, R_BTN, FONT_MONO, FONT_PIXEL } from './constants.js';
@@ -56,6 +58,7 @@ const UserMenu = ({ user, isDark, onClose, onSignOut }) =>
     ),
     React.createElement('div', { style: { height: '1px', background: 'var(--border)', margin: '6px 0' } }),
     React.createElement('button', {
+      // 2. CORRECCIÓN: onSignOut ya viene como prop desde FeedPage
       onClick: onSignOut,
       style: {
         width: '100%', display: 'flex', alignItems: 'center', gap: '10px',
@@ -87,8 +90,6 @@ const FeedCard = ({ proyecto, isDark, onOpen, onDelete }) => {
   },
     React.createElement('div', { style: { height: '3px', background: ACCENT } }),
     React.createElement('div', { style: { padding: '18px' } },
-
-      /* Header */
       React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '14px' } },
         React.createElement('div', {
           style: {
@@ -107,8 +108,6 @@ const FeedCard = ({ proyecto, isDark, onOpen, onDelete }) => {
           )
         )
       ),
-
-      /* Pixel preview */
       React.createElement('div', {
         style: {
           background: isDark ? '#0d0d0d' : '#f3f3f3',
@@ -133,8 +132,6 @@ const FeedCard = ({ proyecto, isDark, onOpen, onDelete }) => {
           );
         })
       ),
-
-      /* Actions */
       React.createElement('div', { style: { display: 'flex', gap: '8px' } },
         React.createElement(Btn, {
           onClick: () => onOpen(proyecto),
@@ -176,7 +173,6 @@ const NewProjectModal = ({ isDark, onClose, onCreate }) => {
       React.createElement('h3', {
         style: { fontFamily: FONT_PIXEL, fontSize: '10px', color: ACCENT, letterSpacing: '2px', margin: 0 }
       }, 'NUEVA FUENTE'),
-
       React.createElement('input', {
         placeholder: 'Nombre de la fuente', value: nombre,
         onChange: e => setNombre(e.target.value),
@@ -187,7 +183,6 @@ const NewProjectModal = ({ isDark, onClose, onCreate }) => {
           color: 'var(--text)', fontSize: '13px', outline: 'none', fontFamily: FONT_MONO
         }
       }),
-
       React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: '8px' } },
         React.createElement(Label, null, 'TAMAÑO DE CUADRÍCULA'),
         React.createElement('div', { style: { display: 'flex', gap: '8px' } },
@@ -206,7 +201,6 @@ const NewProjectModal = ({ isDark, onClose, onCreate }) => {
           )
         )
       ),
-
       React.createElement('div', { style: { display: 'flex', gap: '10px' } },
         React.createElement(Btn, {
           onClick: onClose,
@@ -234,10 +228,10 @@ export function FeedPage({ user, isDark, toggleTheme, proyectos, onOpenProject, 
   const [showUserMenu, setShowUserMenu] = React.useState(false);
   const [showNewModal, setShowNewModal] = React.useState(false);
 
-  // Función corregida para cerrar sesión
+  // 3. CORRECCIÓN: Definimos la función local que usa la función de Firebase
   const handleSignOut = async () => {
     try {
-      await firebaseSignOut(auth);
+      await signOut(auth);
     } catch (err) {
       console.error("Error al cerrar sesión:", err);
     }
@@ -247,7 +241,6 @@ export function FeedPage({ user, isDark, toggleTheme, proyectos, onOpenProject, 
     style: { minHeight: '100vh', background: 'var(--bg)', color: 'var(--text)' },
     onClick: () => { if (showUserMenu) setShowUserMenu(false); }
   },
-
     /* NAV */
     React.createElement('nav', {
       style: {
@@ -261,7 +254,6 @@ export function FeedPage({ user, isDark, toggleTheme, proyectos, onOpenProject, 
       React.createElement('span', {
         style: { fontFamily: FONT_PIXEL, fontSize: '11px', color: ACCENT, letterSpacing: '2px' }
       }, 'CODESHELF'),
-
       React.createElement('div', {
         style: { display: 'flex', gap: '8px', alignItems: 'center', position: 'relative' }
       },
@@ -272,7 +264,6 @@ export function FeedPage({ user, isDark, toggleTheme, proyectos, onOpenProject, 
             borderRadius: R_BTN, padding: '7px', display: 'flex', alignItems: 'center'
           }
         }, React.createElement(Icon, { name: isDark ? 'sun' : 'moon', size: 16, isDark })),
-
         /* Avatar */
         React.createElement('button', {
           onClick: e => { e.stopPropagation(); setShowUserMenu(v => !v); },
@@ -289,70 +280,42 @@ export function FeedPage({ user, isDark, toggleTheme, proyectos, onOpenProject, 
                 style: { fontFamily: FONT_PIXEL, fontSize: '9px', color: ACCENT }
               }, (user?.displayName?.[0] || user?.email?.[0] || 'U').toUpperCase())
         ),
-
         showUserMenu && React.createElement(UserMenu, {
           user, isDark,
           onClose: () => setShowUserMenu(false),
-          onSignOut: handleSignOut // Usamos la función local definida arriba
+          onSignOut: handleSignOut 
         })
       )
     ),
-
     /* FEED */
     React.createElement('div', { style: { maxWidth: '620px', margin: '0 auto', padding: '24px 16px' } },
-
       /* New project trigger */
       React.createElement('div', {
         onClick: () => setShowNewModal(true),
         style: {
           border: '2px dashed var(--border)', borderRadius: R_CARD,
-          padding: '18px 20px',
-          display: 'flex', alignItems: 'center', gap: '14px',
+          padding: '18px 20px', display: 'flex', alignItems: 'center', gap: '14px',
           cursor: 'pointer', marginBottom: '20px', transition: 'all .15s'
         },
-        onMouseEnter: e => {
-          e.currentTarget.style.borderColor = ACCENT;
-          e.currentTarget.style.background = 'rgba(230,34,34,0.03)';
-        },
-        onMouseLeave: e => {
-          e.currentTarget.style.borderColor = '';
-          e.currentTarget.style.background = '';
-        }
+        onMouseEnter: e => { e.currentTarget.style.borderColor = ACCENT; e.currentTarget.style.background = 'rgba(230,34,34,0.03)'; },
+        onMouseLeave: e => { e.currentTarget.style.borderColor = ''; e.currentTarget.style.background = ''; }
       },
         React.createElement('div', {
-          style: {
-            width: '38px', height: '38px', borderRadius: R_BTN,
-            background: ACCENT, flexShrink: 0,
-            display: 'flex', alignItems: 'center', justifyContent: 'center'
-          }
+          style: { width: '38px', height: '38px', borderRadius: R_BTN, background: ACCENT, display: 'flex', alignItems: 'center', justifyContent: 'center' }
         }, React.createElement(Icon, { name: 'plus', size: 18, isDark: true })),
         React.createElement('div', null,
           React.createElement('div', { style: { fontFamily: FONT_MONO, fontSize: '13px', fontWeight: '700', color: 'var(--text)' } }, 'Nueva fuente'),
           React.createElement('div', { style: { fontFamily: FONT_MONO, fontSize: '10px', color: 'var(--text-muted)', marginTop: '2px' } }, 'Crea un nuevo proyecto de pixel font')
         )
       ),
-
       /* Cards */
       React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: '14px' } },
         proyectos.length === 0
-          ? React.createElement('div', {
-              style: { textAlign: 'center', padding: '48px 0', color: 'var(--text-muted)', fontFamily: FONT_MONO, fontSize: '10px', letterSpacing: '3px' }
-            }, 'SIN PROYECTOS AÚN')
-          : proyectos.map(p =>
-              React.createElement(FeedCard, {
-                key: p.id, proyecto: p, isDark,
-                onOpen: onOpenProject,
-                onDelete: onDeleteProject
-              })
-            )
+          ? React.createElement('div', { style: { textAlign: 'center', padding: '48px 0', color: 'var(--text-muted)', fontFamily: FONT_MONO, fontSize: '10px', letterSpacing: '3px' } }, 'SIN PROYECTOS AÚN')
+          : proyectos.map(p => React.createElement(FeedCard, { key: p.id, proyecto: p, isDark, onOpen: onOpenProject, onDelete: onDeleteProject }))
       )
     ),
-
     /* Modal */
-    showNewModal && React.createElement(NewProjectModal, {
-      isDark,
-      onClose: () => setShowNewModal(false),
-      onCreate: onCreateProject
-    })
+    showNewModal && React.createElement(NewProjectModal, { isDark, onClose: () => setShowNewModal(false), onCreate: onCreateProject })
   );
 }
