@@ -16,8 +16,9 @@ const TECLADO = [
   '0','1','2','3','4','5','6','7','8','9',' ',',','.',':',';','!','?'
 ];
 
-const ACCENT = 'linear-gradient(135deg, #ff0000 0%, #990000 100%)';
-const RED_SOLID = '#ff0000';
+const ACCENT = '#ff0000'; 
+const ACCENT_S = '#ff0000'; // Definimos ACCENT_S como rojo para que no de error
+const RED_GRADIENT = 'linear-gradient(135deg, #ff0000 0%, #990000 100%)';
 
 // ─────────────────────────────────────────────
 //  CANVAS ALGORITHMS
