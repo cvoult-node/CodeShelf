@@ -278,11 +278,11 @@ export function FeedPage({ user, isDark, toggleTheme, proyectos, onOpenProject, 
               }, (user?.displayName?.[0] || user?.email?.[0] || 'U').toUpperCase())
         ),
 
-        showUserMenu && React.createElement(UserMenu, {
-          user, isDark,
-          onClose: () => setShowUserMenu(false),
-          onSignOut: () => signOut()
-        })
+    showUserMenu && React.createElement(UserMenu, {
+      user, isDark,
+      onClose: () => setShowUserMenu(false),
+      onSignOut: signOut
+    })
       )
     ),
 
