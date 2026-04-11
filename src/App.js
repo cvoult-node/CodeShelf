@@ -79,20 +79,22 @@ const Btn = ({ onClick, style, children, disabled, title, className = '' }) =>
   }, children);
 
 // Componente para cargar tus iconos SVG de Pixel Art
-const Icon = ({ name, size = 18, style = {} }) => React.createElement('img', {
-  src: `./src/icons/${name}.svg`,
-  style: { 
-    width: `${size}px`, 
-    height: `${size}px`, 
-    imageRendering: 'pixelated',
-    display: 'inline-block',
-    verticalAlign: 'middle',
-    // Este filtro hace que el icono tome el color del texto del padre
-    filter: isDark ? 'brightness(0) invert(1)' : 'none', 
-    ...style
-  },
-  onError: (e) => { e.target.style.display = 'none'; }
-});
+const Icon = ({ name, size = 18, isDark, style = {} }) => {
+  return React.createElement('img', {
+    src: `./src/icons/${name}.svg`,
+    style: { 
+      width: `${size}px`, 
+      height: `${size}px`, 
+      imageRendering: 'pixelated',
+      display: 'inline-block',
+      verticalAlign: 'middle',
+      // Ahora sí reconoce isDark porque se lo pasamos
+      filter: isDark ? 'brightness(0) invert(1)' : 'none', 
+      ...style
+    },
+    onError: (e) => { e.target.style.display = 'none'; }
+  });
+};
 
 // ─────────────────────────────────────────────
 //  MAIN APP
