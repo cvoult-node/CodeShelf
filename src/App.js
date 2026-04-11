@@ -10,11 +10,11 @@ import {
   doc, setDoc, getDocs, collection, query, orderBy, deleteDoc
 } from './firebase.js';
 
-import { ACCENT, FONT_MONO, FONT_PIXEL } from '/constants.js';
-import { Btn }                           from '/ui.js';
-import { floodFill, shiftGrid }          from '/canvas.js';
-import { FeedPage }                      from '/Feed.js';
-import { EditorPage }                    from '/Editor.js';
+import { ACCENT, FONT_MONO, FONT_PIXEL } from './constants.js';
+import { Btn }                           from './ui.js';
+import { floodFill, shiftGrid }          from './canvas.js';
+import { FeedPage }                      from './Feed.js';
+import { EditorPage }                    from './Editor.js';
 
 // Exponer opentype globalmente para canvas.js
 window.__opentype__ = opentype;
