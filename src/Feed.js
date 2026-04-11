@@ -2,7 +2,7 @@
 //  SOCIAL FEED — src/Feed.js
 // ─────────────────────────────────────────────
 import React from 'https://esm.sh/react@18.2.0';
-import { signOut } from './firebase.js';
+import { getAuth, signOut as firebaseSignOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import { ACCENT, R_CARD, R_BTN, FONT_MONO, FONT_PIXEL } from './constants.js';
 import { Btn, Icon, Overlay, Modal, Label } from './ui.js';
 
