@@ -269,13 +269,12 @@ function App() {
     )
   );
 
-  if (setupMode) return React.createElement(FeedPage, {
-    user, isDark, toggleTheme,
-    proyectos,
-    onOpenProject:   abrirProyecto,
-    onCreateProject: handleCreateProject,
-    onDeleteProject: handleDeleteProject
-  });
+ if (setupMode) return React.createElement(FeedBridge, {
+  proyectos,
+  onOpen: abrirProyecto,
+  onCreate: handleCreateProject,
+  onDelete: handleDeleteProject
+});
 
   return React.createElement(EditorPage, {
     isDark, toggleTheme,
