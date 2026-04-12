@@ -1,18 +1,19 @@
 // ─────────────────────────────────────────────
-//  APP — App.js  (orquestador principal)
+//  App.js  —  Editor React
+//  Lee el proyecto activo de sessionStorage.
+//  Si no hay proyecto, redirige a feed.html.
 // ─────────────────────────────────────────────
 import React, { useState, useEffect, useRef, useCallback } from 'https://esm.sh/react@18.2.0';
 import ReactDOM from 'https://esm.sh/react-dom@18.2.0/client';
 import opentype from 'https://esm.sh/opentype.js';
+
 import {
-  auth, provider, db, signInWithPopup, signOut, onAuthStateChanged,
-  signInWithEmailAndPassword, createUserWithEmailAndPassword,
-  doc, setDoc, getDocs, collection, query, orderBy, deleteDoc
+  auth, db, onAuthStateChanged,
+  doc, setDoc
 } from './firebase.js';
 
 import { ACCENT, FONT_MONO, FONT_PIXEL } from './constants.js';
 import { Btn }                           from './ui.js';
-import { renderFeed, initFeedEvents } from './Feed.js';
 import { floodFill, shiftGrid }          from './canvas.js';
 import { EditorPage }                    from './Editor.js';
 
@@ -30,16 +31,12 @@ function App() {
   useEffect(() => { document.documentElement.className = theme; }, [theme]);
 
   // ── Auth ────────────────────────────────────
-  const [user,     setUser]     = useState(null);
-  const [loading,  setLoading]  = useState(true);
-  const [email,    setEmail]    = useState('');
-  const [password, setPassword] = useState('');
+  const [user,    setUser]    = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  // ── Projects ────────────────────────────────
-  const [proyectos,      setProyectos]      = useState([]);
+  // ── Proyecto (desde sessionStorage) ─────────
   const [proyectoActivo, setProyectoActivo] = useState(null);
   const [proyectoNombre, setProyectoNombre] = useState('mi-fuente');
-  const [setupMode,      setSetupMode]      = useState(true);
 
   // ── Editor state ────────────────────────────
   const [gridSize,    setGridSize]    = useState(8);
@@ -53,24 +50,43 @@ function App() {
   const isDrawing = useRef(false);
   const drawMode  = useRef(true);
 
-  // ── Firebase ─────────────────────────────────
-  const cargarProyectos = useCallback(async (u) => {
+  // ── Leer proyecto de sessionStorage ─────────
+  useEffect(() => {
+    const raw = sessionStorage.getItem('proyectoActivo');
+    if (!raw) {
+      // Sin proyecto activo → volver al feed
+      window.location.href = 'feed.html';
+      return;
+    }
     try {
-      const q   = query(collection(db, 'usuarios', u.uid, 'proyectos'), orderBy('updatedAt', 'desc'));
-      const snp = await getDocs(q);
-      setProyectos(snp.docs.map(d => ({ id: d.id, ...d.data() })));
-    } catch (e) { console.error(e); }
+      const p = JSON.parse(raw);
+      setProyectoActivo(p.id);
+      setProyectoNombre(p.nombre || 'mi-fuente');
+      setGridSize(p.gridSize || 8);
+      setFontData(p.font || {});
+      setGrid(p.font?.['A'] || Array((p.gridSize || 8) * (p.gridSize || 8)).fill(false));
+      setCurrentChar('A');
+    } catch (e) {
+      console.error('Error leyendo proyecto:', e);
+      window.location.href = 'feed.html';
+    }
   }, []);
 
+  // ── Auth ─────────────────────────────────────
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, u => {
+      if (!u) {
+        // No autenticado → volver al feed (que maneja el login)
+        window.location.href = 'feed.html';
+        return;
+      }
       setUser(u);
-      if (u) cargarProyectos(u);
       setLoading(false);
     });
     return unsub;
-  }, [cargarProyectos]);
+  }, []);
 
+  // ── Guardar fuente ───────────────────────────
   const handleSaveFont = useCallback(async (data) => {
     if (!user || !proyectoActivo) return;
     setIsSaving(true);
@@ -80,37 +96,20 @@ function App() {
         { font: data, gridSize, updatedAt: new Date() },
         { merge: true }
       );
-    } catch { alert('Error al guardar'); }
+      // Actualizar sessionStorage con los nuevos datos
+      const raw = sessionStorage.getItem('proyectoActivo');
+      if (raw) {
+        const p = JSON.parse(raw);
+        sessionStorage.setItem('proyectoActivo', JSON.stringify({ ...p, font: data, gridSize }));
+      }
+    } catch (err) {
+      console.error('Error guardando:', err);
+      alert('Error al guardar');
+    }
     setIsSaving(false);
   }, [user, proyectoActivo, gridSize]);
 
-  // ── Project actions ──────────────────────────
-  const handleCreateProject = async (nombre, size) => {
-    const id   = Date.now().toString();
-    const ref  = doc(db, 'usuarios', user.uid, 'proyectos', id);
-    const data = { nombre, gridSize: size, font: {}, updatedAt: new Date() };
-    await setDoc(ref, data);
-    abrirProyecto({ id, ...data });
-    cargarProyectos(user);
-  };
-
-  const handleDeleteProject = async (id) => {
-    if (!confirm('¿Borrar este proyecto?')) return;
-    await deleteDoc(doc(db, 'usuarios', user.uid, 'proyectos', id));
-    cargarProyectos(user);
-  };
-
-  const abrirProyecto = (p) => {
-    setProyectoActivo(p.id);
-    setProyectoNombre(p.nombre || 'mi-fuente');
-    setGridSize(p.gridSize);
-    setFontData(p.font || {});
-    setGrid(p.font?.['A'] || Array(p.gridSize * p.gridSize).fill(false));
-    setCurrentChar('A');
-    setSetupMode(false);
-  };
-
-  // ── Canvas actions ───────────────────────────
+  // ── Canvas tools ─────────────────────────────
   const applyPixelTool = useCallback((prevGrid, i) => {
     const g  = [...prevGrid];
     const r  = Math.floor(i / gridSize);
@@ -183,99 +182,29 @@ function App() {
     });
   };
 
-  // ─────────────────────────────────────────
-  //  VIEWS
-  // ─────────────────────────────────────────
-
-  if (loading) return React.createElement('div', {
-    style: {
-      height: '100vh', background: '#0a0a0a',
-      display: 'flex', flexDirection: 'column',
-      alignItems: 'center', justifyContent: 'center', gap: '18px'
-    }
-  },
-    React.createElement('span', {
-      style: { fontFamily: FONT_PIXEL, fontSize: '12px', color: ACCENT, letterSpacing: '3px', animation: 'pulse 1.4s infinite' }
-    }, 'CARGANDO...'),
-    React.createElement('div', { style: { width: '160px', height: '2px', background: ACCENT, borderRadius: '2px' } })
-  );
-
-  if (!user) return React.createElement('div', {
-    style: { minHeight: '100vh', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }
-  },
-    React.createElement('div', {
+  // ── Loading ──────────────────────────────────
+  if (loading || !proyectoActivo) {
+    return React.createElement('div', {
       style: {
-        width: '100%', maxWidth: '380px',
-        background: isDark ? '#0f0f0f' : '#fff',
-        border: '1px solid var(--border)',
-        borderRadius: '14px', padding: '40px 36px',
-        boxShadow: isDark ? '0 24px 60px rgba(0,0,0,0.6)' : '0 24px 60px rgba(0,0,0,0.1)'
+        height: '100vh', background: '#0a0a0a',
+        display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center', gap: '18px'
       }
     },
-      React.createElement('div', { style: { textAlign: 'center', marginBottom: '32px' } },
-        React.createElement('div', { style: { fontFamily: FONT_PIXEL, fontSize: '20px', lineHeight: 1.8, color: ACCENT } }, 'CODE\nSHELF'),
-        React.createElement('p', { style: { color: 'var(--text-muted)', fontSize: '9px', letterSpacing: '5px', marginTop: '8px', fontFamily: FONT_MONO } }, 'PIXEL FONT STUDIO')
-      ),
-      React.createElement('form', {
-        onSubmit: e => {
-          e.preventDefault();
-          signInWithEmailAndPassword(auth, email, password)
-            .catch(() => createUserWithEmailAndPassword(auth, email, password));
-        },
-        style: { display: 'flex', flexDirection: 'column', gap: '10px' }
-      },
-        ...[
-          { type: 'email',    placeholder: 'Email',      value: email,    setter: setEmail },
-          { type: 'password', placeholder: 'Contraseña', value: password, setter: setPassword }
-        ].map(({ type, placeholder, value, setter }) =>
-          React.createElement('input', {
-            key: type, type, placeholder, value,
-            onChange: e => setter(e.target.value),
-            style: {
-              background: 'var(--surface2)', border: '1px solid var(--border)',
-              borderRadius: '6px', padding: '12px 15px',
-              color: 'var(--text)', fontSize: '13px', outline: 'none', fontFamily: FONT_MONO
-            }
-          })
-        ),
-        React.createElement(Btn, {
-          style: {
-            background: ACCENT, color: '#fff', borderRadius: '6px',
-            padding: '13px', fontWeight: '700', fontSize: '12px',
-            letterSpacing: '2px', width: '100%', marginTop: '4px', fontFamily: FONT_MONO
-          }
-        }, 'ENTRAR')
-      ),
-      React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '10px', margin: '18px 0' } },
-        React.createElement('div', { style: { flex: 1, height: '1px', background: 'var(--border)' } }),
-        React.createElement('span', { style: { color: 'var(--text-muted)', fontSize: '9px', letterSpacing: '2px', fontFamily: FONT_MONO } }, 'O'),
-        React.createElement('div', { style: { flex: 1, height: '1px', background: 'var(--border)' } })
-      ),
-      React.createElement(Btn, {
-        onClick: () => signInWithPopup(auth, provider),
+      React.createElement('span', {
         style: {
-          width: '100%', padding: '12px',
-          background: isDark ? 'rgba(255,255,255,0.05)' : '#fff',
-          border: '1px solid var(--border)', borderRadius: '6px',
-          color: 'var(--text)', fontSize: '12px', fontWeight: '700', fontFamily: FONT_MONO
+          fontFamily: FONT_PIXEL, fontSize: '10px',
+          color: ACCENT, letterSpacing: '4px',
+          animation: 'pulse 1.4s infinite'
         }
-      }, '🔑  Continuar con Google'),
-      React.createElement('div', { style: { textAlign: 'center', marginTop: '20px' } },
-        React.createElement(Btn, {
-          onClick: toggleTheme,
-          style: { background: 'none', color: 'var(--text-muted)', fontSize: '18px', padding: '4px 10px', borderRadius: '6px' }
-        }, isDark ? '☀️' : '🌙')
-      )
-    )
-  );
+      }, 'CARGANDO...'),
+      React.createElement('div', {
+        style: { width: '160px', height: '2px', background: ACCENT, borderRadius: '2px' }
+      })
+    );
+  }
 
- if (setupMode) return React.createElement(FeedBridge, {
-  proyectos,
-  onOpen: abrirProyecto,
-  onCreate: handleCreateProject,
-  onDelete: handleDeleteProject
-});
-
+  // ── Editor ───────────────────────────────────
   return React.createElement(EditorPage, {
     isDark, toggleTheme,
     gridSize, currentChar, fontData, grid, isSaving,
@@ -288,17 +217,9 @@ function App() {
     onInvert:      invertCanvas,
     onShift:       doShift,
     onSave:        () => handleSaveFont(fontData),
-    onBack:        () => setSetupMode(true),
+    onBack:        () => window.location.href = 'feed.html',
     projectName:   proyectoNombre
   });
-}
-
-function FeedBridge({ proyectos, onOpen, onCreate, onDelete }) {
-  useEffect(() => {
-    renderFeed(proyectos, onOpen, onDelete);
-    initFeedEvents(onCreate);
-  }, [proyectos]);
-  return null; 
 }
 
 // ─────────────────────────────────────────────

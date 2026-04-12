@@ -1,154 +1,152 @@
+// ─────────────────────────────────────────────
+//  Feed.js  —  DOM vanilla puro
+//  Sin dependencias de React.
+//  Llamado desde feed.html vía script type="module"
+// ─────────────────────────────────────────────
 
-import { signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-import { auth, db } from './firebase.js'; 
-import { doc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-/**
- * RENDERIZA LA LISTA DE PROYECTOS
- */
+import { signOut } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+import { auth }    from './firebase.js';
+
+// ── Render lista de proyectos ─────────────────
 export function renderFeed(proyectos, onOpen, onDelete) {
-    const container = document.getElementById('projects-list');
-    const template = document.getElementById('tpl-project');
-    
-    if (!container || !template) return;
-    container.innerHTML = ''; 
+  const container = document.getElementById('projects-list');
+  const template  = document.getElementById('tpl-project');
+  if (!container || !template) return;
 
-    if (proyectos.length === 0) {
-        container.innerHTML = '<div style="text-align:center; padding:48px; color:var(--text-muted); font-size:10px; letter-spacing:3px;">SIN PROYECTOS AÚN</div>';
-        return;
-    }
+  container.innerHTML = '';
 
-    proyectos.forEach(proyecto => {
-        const clone = template.content.cloneNode(true);
-        
-        // 1. Rellenar textos
-        clone.querySelector('.p-title').textContent = proyecto.nombre || 'Sin nombre';
-        
-        // Calcular glifos reales (que tengan algún píxel pintado)
-        const glyphsCount = Object.values(proyecto.font || {}).filter(g => g?.some(Boolean)).length;
-        clone.querySelector('.p-meta').textContent = `${proyecto.gridSize}PX · ${glyphsCount} GLIFOS`;
-        
-        // 2. Dibujar Preview (Llamada a la función interna)
-        const previewContainer = clone.querySelector('.p-preview');
-        if (previewContainer) {
-            renderPreview(previewContainer, proyecto);
-        }
+  if (!proyectos || proyectos.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <span>✏️</span>
+        SIN PROYECTOS AÚN<br><br>
+        <span style="font-size:9px;opacity:0.7">Crea tu primera fuente pixel</span>
+      </div>`;
+    return;
+  }
 
-        // 3. Configurar botones
-        const btnOpen = clone.querySelector('.btn-open');
-        if (btnOpen) btnOpen.onclick = () => onOpen(proyecto);
+  proyectos.forEach(proyecto => {
+    const clone = template.content.cloneNode(true);
 
-        const btnDel = clone.querySelector('.btn-del');
-        if (btnDel) {
-            btnDel.onclick = (e) => {
-                e.stopPropagation();
-                if(confirm(`¿Seguro que quieres borrar "${proyecto.nombre}"?`)) {
-                    onDelete(proyecto.id);
-                }
-            };
-        }
+    // Textos
+    clone.querySelector('.p-title').textContent = proyecto.nombre || 'Sin nombre';
+    const glyphCount = Object.values(proyecto.font || {})
+      .filter(g => Array.isArray(g) && g.some(Boolean)).length;
+    clone.querySelector('.p-meta').textContent =
+      `${proyecto.gridSize || 8}PX · ${glyphCount} GLIFO${glyphCount !== 1 ? 'S' : ''}`;
 
-        container.appendChild(clone);
-    });
+    // Preview ABC
+    const preview = clone.querySelector('.p-preview');
+    if (preview) renderMiniPreview(preview, proyecto);
+
+    // Botones
+    clone.querySelector('.btn-open').onclick = () => onOpen(proyecto);
+    clone.querySelector('.btn-del').onclick  = (e) => {
+      e.stopPropagation();
+      if (confirm(`¿Borrar "${proyecto.nombre}"?`)) onDelete(proyecto.id);
+    };
+
+    container.appendChild(clone);
+  });
 }
 
-/**
- * DIBUJA LOS MINI PÍXELES (ABC)
- */
-function renderPreview(container, proyecto) {
-    container.innerHTML = ''; // Limpiar previo
-    const chars = ['A', 'B', 'C'];
-    
-    chars.forEach(char => {
-        const glyph = proyecto.font?.[char] || [];
-        const size = proyecto.gridSize || 8;
-        
-        const miniGrid = document.createElement('div');
-        miniGrid.style.display = 'grid';
-        miniGrid.style.gridTemplateColumns = `repeat(${size}, 3px)`;
-        miniGrid.style.gap = '0px';
-        
-        // Dibujamos solo si hay datos, si no, mostramos rejilla vacía
-        const totalPixels = size * size;
-        for (let i = 0; i < totalPixels; i++) {
-            const px = document.createElement('div');
-            px.style.width = '3px';
-            px.style.height = '3px';
-            // Si el píxel está activo, rojo. Si no, transparente u oscuro.
-            px.style.background = glyph[i] ? '#e62222' : 'rgba(255,255,255,0.03)';
-            miniGrid.appendChild(px);
-        }
-        container.appendChild(miniGrid);
-    });
+// ── Mini preview (A B C) ──────────────────────
+function renderMiniPreview(container, proyecto) {
+  container.innerHTML = '';
+  const chars = ['A', 'B', 'C'];
+  const size  = proyecto.gridSize || 8;
+
+  chars.forEach(char => {
+    const glyph = proyecto.font?.[char] || [];
+
+    const grid = document.createElement('div');
+    grid.style.cssText = `
+      display: grid;
+      grid-template-columns: repeat(${size}, 3px);
+      gap: 0;
+    `;
+
+    for (let i = 0; i < size * size; i++) {
+      const px = document.createElement('div');
+      px.style.cssText = `
+        width: 3px; height: 3px;
+        background: ${glyph[i] ? '#e62222' : 'rgba(255,255,255,0.04)'};
+      `;
+      grid.appendChild(px);
+    }
+    container.appendChild(grid);
+  });
 }
 
-/**
- * INICIALIZA EVENTOS ESTÁTICOS (Botones que no cambian)
- */
-export function initStaticEvents() {
-    // Logout
-    const logoutBtn = document.getElementById('logout-btn');
-    if (logoutBtn) {
-        logoutBtn.onclick = async () => {
-            try {
-                await signOut(auth);
-                window.location.reload();
-            } catch (err) {
-                console.error("Error al cerrar sesión:", err);
-            }
-        };
-    }
-
-    // Avatar / Menú de usuario
-    const profileBtn = document.getElementById('profile-btn');
-    if (profileBtn) {
-        profileBtn.onclick = () => {
-            const menu = document.getElementById('user-menu');
-            if (menu) menu.classList.toggle('hidden');
-        };
-    }
-}
-
+// ── Eventos del modal de creación ────────────
+//    Se llama UNA sola vez tras montar el feed.
+let feedEventsInit = false;
 export function initFeedEvents(onCreateProject) {
-    const btnNew = document.getElementById('btn-new-font'); // El botón con el +
-    const modal = document.getElementById('modal-overlay');
-    const btnClose = document.getElementById('close-modal');
-    const btnConfirm = document.getElementById('confirm-create');
-    const inputName = document.getElementById('new-font-name');
+  // Evitar doble-bind si renderFeed se llama varias veces
+  if (feedEventsInit) {
+    // Re-bind solo el confirm por si onCreateProject cambió
+    const btn = document.getElementById('confirm-create');
+    if (btn) btn._onCreate = onCreateProject;
+    return;
+  }
+  feedEventsInit = true;
 
-    // 1. Abrir Modal
-    if (btnNew) {
-        btnNew.onclick = () => {
-            modal.classList.remove('hidden');
-            inputName.focus();
-        };
+  const modal      = document.getElementById('modal-overlay');
+  const btnNew     = document.getElementById('btn-new-font');
+  const btnClose   = document.getElementById('close-modal');
+  const btnConfirm = document.getElementById('confirm-create');
+  const inputName  = document.getElementById('new-font-name');
+
+  if (!modal || !btnNew || !btnClose || !btnConfirm || !inputName) {
+    console.warn('Feed: faltan elementos del modal');
+    return;
+  }
+
+  // Guardar referencia mutable al callback
+  btnConfirm._onCreate = onCreateProject;
+
+  // Abrir modal
+  btnNew.onclick = () => {
+    modal.classList.remove('hidden');
+    inputName.value = '';
+    inputName.focus();
+  };
+
+  // Cerrar modal
+  btnClose.onclick = () => modal.classList.add('hidden');
+
+  // Cerrar al click fuera del box
+  modal.onclick = (e) => {
+    if (e.target === modal) modal.classList.add('hidden');
+  };
+
+  // Enter en el input
+  inputName.onkeydown = (e) => {
+    if (e.key === 'Enter') btnConfirm.click();
+  };
+
+  // Confirmar creación
+  btnConfirm.onclick = async () => {
+    const nombre = inputName.value.trim();
+    if (!nombre) {
+      inputName.focus();
+      inputName.style.borderColor = '#e62222';
+      setTimeout(() => inputName.style.borderColor = '', 1000);
+      return;
     }
 
-    // 2. Cerrar Modal
-    if (btnClose) {
-        btnClose.onclick = () => modal.classList.add('hidden');
-    }
+    btnConfirm.disabled    = true;
+    btnConfirm.textContent = '...';
 
-    // 3. Confirmar Creación
-    if (btnConfirm) {
-        btnConfirm.onclick = async () => {
-            const nombre = inputName.value.trim();
-            if (!nombre) return alert("Escribe un nombre");
-            
-            btnConfirm.disabled = true;
-            btnConfirm.textContent = "...";
-            
-            await onCreateProject(nombre, 8); // Creamos con tamaño 8 por defecto
-            
-            btnConfirm.disabled = false;
-            btnConfirm.textContent = "CREAR";
-            inputName.value = "";
-            modal.classList.add('hidden');
-        };
+    try {
+      await btnConfirm._onCreate(nombre, 8);
+    } catch (err) {
+      console.error('Error creando proyecto:', err);
+      alert('No se pudo crear el proyecto. Inténtalo de nuevo.');
+    } finally {
+      btnConfirm.disabled    = false;
+      btnConfirm.textContent = 'CREAR';
+      modal.classList.add('hidden');
     }
-
-    // 4. Logout
-    const logoutBtn = document.getElementById('logout-btn');
-    if (logoutBtn) {
-        logoutBtn.onclick = () => signOut(auth).then(() => window.location.reload());
-    }
+  };
 }
