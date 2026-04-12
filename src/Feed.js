@@ -107,3 +107,48 @@ export function initStaticEvents() {
         };
     }
 }
+
+export function initFeedEvents(onCreateProject) {
+    const btnNew = document.getElementById('btn-new-font'); // El botón con el +
+    const modal = document.getElementById('modal-overlay');
+    const btnClose = document.getElementById('close-modal');
+    const btnConfirm = document.getElementById('confirm-create');
+    const inputName = document.getElementById('new-font-name');
+
+    // 1. Abrir Modal
+    if (btnNew) {
+        btnNew.onclick = () => {
+            modal.classList.remove('hidden');
+            inputName.focus();
+        };
+    }
+
+    // 2. Cerrar Modal
+    if (btnClose) {
+        btnClose.onclick = () => modal.classList.add('hidden');
+    }
+
+    // 3. Confirmar Creación
+    if (btnConfirm) {
+        btnConfirm.onclick = async () => {
+            const nombre = inputName.value.trim();
+            if (!nombre) return alert("Escribe un nombre");
+            
+            btnConfirm.disabled = true;
+            btnConfirm.textContent = "...";
+            
+            await onCreateProject(nombre, 8); // Creamos con tamaño 8 por defecto
+            
+            btnConfirm.disabled = false;
+            btnConfirm.textContent = "CREAR";
+            inputName.value = "";
+            modal.classList.add('hidden');
+        };
+    }
+
+    // 4. Logout
+    const logoutBtn = document.getElementById('logout-btn');
+    if (logoutBtn) {
+        logoutBtn.onclick = () => signOut(auth).then(() => window.location.reload());
+    }
+}
