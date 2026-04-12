@@ -7,12 +7,15 @@
   <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Press+Start+2P&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="src/shared.css">
   <style>
-    body { overflow-y: scroll; }
+    body {
+      overflow-y: scroll;
+      background-image: radial-gradient(ellipse 70% 40% at 50% 0%, rgba(191,69,69,0.04) 0%, transparent 60%);
+    }
 
     .feed-wrap {
       max-width: 680px;
       margin: 0 auto;
-      padding: 28px 16px 60px;
+      padding: 28px 16px 64px;
     }
 
     .feed-header {
@@ -23,7 +26,7 @@
     }
     .feed-title {
       font-family: var(--pixel);
-      font-size: 11px;
+      font-size: 10px;
       color: var(--text);
       letter-spacing: 2px;
     }
@@ -39,65 +42,77 @@
       border: 1px solid var(--border);
       border-radius: var(--r-card);
       overflow: hidden;
-      margin-bottom: 20px;
-      transition: border-color .15s, transform .15s;
+      margin-bottom: 16px;
+      transition: border-color .18s, transform .15s, box-shadow .18s;
       cursor: pointer;
+      box-shadow: var(--shadow-card);
     }
     .post-card:hover {
-      border-color: rgba(230,34,34,0.35);
-      transform: translateY(-1px);
+      border-color: var(--border-accent);
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-hover);
     }
-    .card-accent-line { height: 3px; background: var(--accent); }
 
-    .card-body { padding: 18px 20px; }
+    .card-accent-line {
+      height: 2px;
+      background: linear-gradient(90deg, var(--accent), transparent);
+    }
+
+    .card-body { padding: 20px; }
 
     .card-top {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      margin-bottom: 14px;
+      margin-bottom: 16px;
     }
+
     .card-author {
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 12px;
     }
+
     .author-avatar {
-      width: 30px; height: 30px;
+      width: 32px; height: 32px;
       border-radius: 50%;
       display: flex; align-items: center; justify-content: center;
       font-family: var(--pixel); font-size: 8px;
-      border: 1.5px solid var(--accent);
+      border: 1.5px solid;
       flex-shrink: 0;
-      font-weight: 700;
     }
-    .author-name { font-size: 11px; font-weight: 700; }
-    .author-date { font-size: 9px; color: var(--muted); margin-top: 2px; letter-spacing: 1px; }
+
+    .author-name { font-size: 12px; font-weight: 700; color: var(--text); }
+    .author-date {
+      font-size: 9px;
+      color: var(--muted);
+      margin-top: 2px;
+      letter-spacing: 1px;
+    }
 
     .card-badge {
       font-size: 8px;
       letter-spacing: 2px;
       color: var(--accent);
-      border: 1px solid rgba(230,34,34,0.3);
-      border-radius: 4px;
+      border: 1px solid var(--border-accent);
+      border-radius: 5px;
       padding: 4px 8px;
+      background: var(--accent2);
     }
 
     /* Preview canvas area */
     .card-preview {
-      background: #0a0a0f;
+      background: #07050f;
       border-radius: 8px;
+      border: 1px solid var(--border);
       padding: 16px;
-      margin-bottom: 14px;
-      min-height: 60px;
+      margin-bottom: 16px;
+      min-height: 64px;
       display: flex;
       align-items: center;
       overflow: hidden;
     }
-    .card-preview canvas {
-      image-rendering: pixelated;
-      max-width: 100%;
-    }
+    .card-preview canvas { image-rendering: pixelated; max-width: 100%; }
 
     .card-meta-row {
       display: flex;
@@ -118,28 +133,32 @@
 
     .card-glyphs-row {
       display: flex;
-      gap: 6px;
-      margin-top: 12px;
+      gap: 8px;
+      margin-top: 14px;
       flex-wrap: wrap;
     }
 
     .btn-demo {
       display: block;
       width: 100%;
-      margin-top: 14px;
+      margin-top: 16px;
       padding: 10px;
       background: none;
-      border: 1px solid var(--border2);
+      border: 1px solid var(--border);
       border-radius: var(--r-btn);
       color: var(--muted);
       font-family: var(--mono);
       font-size: 9px;
       letter-spacing: 2px;
       cursor: pointer;
-      transition: border-color .15s, color .15s;
+      transition: border-color .15s, color .15s, background .15s;
       text-align: center;
     }
-    .btn-demo:hover { border-color: var(--accent); color: var(--accent); }
+    .btn-demo:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+      background: var(--accent3);
+    }
 
     /* Empty state */
     .empty {
@@ -147,16 +166,12 @@
       padding: 80px 20px;
       color: var(--muted);
     }
-    .empty-icon {
-      font-size: 40px;
-      margin-bottom: 16px;
-      opacity: .3;
-    }
+    .empty-icon { font-size: 36px; margin-bottom: 16px; opacity: .25; }
     .empty-title {
       font-family: var(--pixel);
       font-size: 10px;
       letter-spacing: 3px;
-      margin-bottom: 8px;
+      margin-bottom: 10px;
     }
     .empty-sub { font-size: 10px; color: var(--muted2); }
   </style>
@@ -197,8 +212,9 @@
     const hide = id => document.getElementById(id).classList.add('hidden');
     const show = id => document.getElementById(id).classList.remove('hidden');
 
-    // Colores de avatar por inicial
-    const AVATAR_COLORS = ['#e62222','#2265e6','#22e662','#e6a022','#a022e6','#22e6cc'];
+    const AVATAR_COLORS = [
+      '#bf4545','#4575bf','#45bf78','#bf9045','#8045bf','#45b8bf'
+    ];
     function avatarColor(str) {
       let h = 0;
       for (const c of (str||'?')) h = (h * 31 + c.charCodeAt(0)) & 0xffffffff;
@@ -220,7 +236,8 @@
     function renderPosts(posts, currentUid) {
       const list = document.getElementById('posts-list');
       list.innerHTML = '';
-      document.getElementById('post-count').textContent = `${posts.length} FUENTE${posts.length !== 1 ? 'S' : ''}`;
+      document.getElementById('post-count').textContent =
+        `${posts.length} FUENTE${posts.length !== 1 ? 'S' : ''}`;
 
       if (!posts.length) {
         list.innerHTML = `
@@ -242,14 +259,12 @@
         const bgCol      = avatarColor(post.uid);
         const previewStr = post.previewText || 'HELLO';
 
-        // Canvas preview
         const canvas = createTextCanvas(previewStr, post.font || {}, post.gridSize || 8, {
-          pixelSize: 4, color: '#e62222', letterSpacing: 2, paddingX: 16, paddingY: 12
+          pixelSize: 4, color: '#bf4545', letterSpacing: 2, paddingX: 16, paddingY: 12
         });
 
-        // Glifos disponibles (primeros 20)
         const glyphsHtml = chars.slice(0, 20).map(ch => {
-          const g = createGlyphGrid(post.font[ch], post.gridSize || 8, 2);
+          const g = createGlyphGrid(post.font[ch], post.gridSize || 8, 2, '#bf4545');
           const wrap = document.createElement('div');
           wrap.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:3px;';
           const label = document.createElement('span');
@@ -265,7 +280,10 @@
           <div class="card-body">
             <div class="card-top">
               <div class="card-author">
-                <div class="author-avatar" style="background:${bgCol}22;border-color:${bgCol};color:${bgCol};">${initial}</div>
+                <div class="author-avatar"
+                     style="background:${bgCol}18;border-color:${bgCol}80;color:${bgCol};">
+                  ${initial}
+                </div>
                 <div>
                   <div class="author-name">${post.autorNombre || post.autorEmail || 'Anónimo'}</div>
                   <div class="author-date">${formatDate(post.publishedAt)}</div>
@@ -282,14 +300,10 @@
             <button class="btn-demo">VER DEMOSTRACIÓN COMPLETA →</button>
           </div>`;
 
-        // Insertar canvas
         card.querySelector(`#preview-${post.id}`).appendChild(canvas);
-
-        // Insertar glifos
         const glyphsRow = card.querySelector(`#glyphs-${post.id}`);
         glyphsHtml.forEach(g => glyphsRow.appendChild(g));
 
-        // Click → página de demo
         card.querySelector('.btn-demo').onclick = (e) => {
           e.stopPropagation();
           sessionStorage.setItem('demoPost', JSON.stringify(post));
@@ -304,27 +318,21 @@
       });
     }
 
-    // Auth + carga
     onAuthStateChanged(auth, async (user) => {
       hide('screen-loading');
       show('screen-app');
 
-      // Navbar: mostrar avatar y link a proyectos si está logueado
       if (user) {
-        const avatarEl = document.getElementById('nav-avatar');
+        const avatarEl     = document.getElementById('nav-avatar');
         const navProyectos = document.getElementById('nav-proyectos');
-
-        // Cargar perfil
         try {
           const perfil = await getDoc(doc(db, 'usuarios', user.uid, 'config', 'perfil'));
           const nombre = perfil.exists() ? perfil.data().displayName : null;
           avatarEl.textContent = (nombre || user.email || '?')[0].toUpperCase();
         } catch { avatarEl.textContent = (user.email || '?')[0].toUpperCase(); }
-
         navProyectos.style.display = '';
         navProyectos.onclick = () => window.location.href = 'feed.html';
       } else {
-        // No logueado: avatar como link al login
         const avatarEl = document.getElementById('nav-avatar');
         avatarEl.href = 'index.html';
         avatarEl.textContent = '?';
