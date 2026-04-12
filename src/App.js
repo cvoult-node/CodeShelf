@@ -294,6 +294,14 @@ function App() {
   });
 }
 
+function FeedBridge({ proyectos, onOpen, onCreate, onDelete }) {
+  useEffect(() => {
+    renderFeed(proyectos, onOpen, onDelete);
+    initFeedEvents(onCreate);
+  }, [proyectos]);
+  return null; 
+}
+
 // ─────────────────────────────────────────────
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(React.createElement(App));
