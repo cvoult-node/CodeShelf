@@ -1,42 +1,32 @@
 import { auth, db, signOut, doc, deleteDoc } from './firebase.js';
 
-export function renderFeed(proyectos, onOpen) {
-  const listContainer = document.getElementById('projects-list');
-  const template = document.getElementById('card-template');
+export function renderFeed(proyectos, onOpen, onDelete) {
+  const container = document.getElementById('projects-list');
+  const template = document.getElementById('tpl-project'); // El ID que pusimos en el HTML
   
-  listContainer.innerHTML = ''; // Limpiar lista
+  if (!container || !template) return;
+  container.innerHTML = ''; 
 
   if (proyectos.length === 0) {
-    listContainer.innerHTML = '<p class="empty-msg">SIN PROYECTOS AÚN</p>';
+    container.innerHTML = '<div style="text-align:center; padding:40px; opacity:0.5;">SIN PROYECTOS AÚN</div>';
     return;
   }
 
   proyectos.forEach(proyecto => {
     const clone = template.content.cloneNode(true);
     
-    // Inyectar datos
-    clone.querySelector('.project-name').textContent = proyecto.nombre || 'Sin nombre';
-    clone.querySelector('.project-initial').textContent = (proyecto.nombre?.[0] || 'F').toUpperCase();
-    
+    // Rellenar datos en el HTML real
+    clone.querySelector('.p-title').textContent = proyecto.nombre || 'Sin nombre';
     const glyphsCount = Object.keys(proyecto.font || {}).length;
-    clone.querySelector('.project-details').textContent = `${proyecto.gridSize}PX · ${glyphsCount} GLIFOS`;
-
-    // Lógica del botón Abrir
+    clone.querySelector('.p-meta').textContent = `${proyecto.gridSize}PX · ${glyphsCount} GLIFOS`;
+    
+    // Configurar botones
     clone.querySelector('.btn-open').onclick = () => onOpen(proyecto);
-
-    // Lógica del botón Borrar
-    clone.querySelector('.btn-delete').onclick = async () => {
-      if(confirm(`¿Eliminar ${proyecto.nombre}?`)) {
-        await deleteDoc(doc(db, "proyectos", proyecto.id));
-        // Aquí podrías disparar un refresco de la lista
-      }
+    clone.querySelector('.btn-del').onclick = () => {
+        if(confirm(`¿Borrar ${proyecto.nombre}?`)) onDelete(proyecto.id);
     };
 
-    // Generar Preview de Píxeles (ABC)
-    const previewDiv = clone.querySelector('.pixel-preview');
-    renderPreview(previewDiv, proyecto);
-
-    listContainer.appendChild(clone);
+    container.appendChild(clone);
   });
 }
 
