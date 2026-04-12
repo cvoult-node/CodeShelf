@@ -12,7 +12,7 @@ import {
 
 import { ACCENT, FONT_MONO, FONT_PIXEL } from './constants.js';
 import { Btn }                           from './ui.js';
-import { renderFeed } from './Feed.js';
+import { renderFeed, initFeedEvents } from './Feed.js';
 import { floodFill, shiftGrid }          from './canvas.js';
 import { EditorPage }                    from './Editor.js';
 
