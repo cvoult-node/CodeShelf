@@ -104,67 +104,38 @@ export function EditorPage({
     { icon: '→',  label: 'Der',    fn: () => onShift('right') },
   ];
 
-  return React.createElement('div', {
-    style: { minHeight: '100vh', background: 'var(--bg)', color: 'var(--text)' },
-    onMouseUp,
-    onContextMenu: e => e.preventDefault()
-  },
+  return React.createElement('div', { className: 'editor-layout' },
+    // NAVBAR DEL EDITOR
+    React.createElement('nav', { className: 'navbar' },
+      React.createElement('div', { className: 'nav-left' },
+        React.createElement('span', { className: 'logo' }, 'CODESHELF'),
+        
+        // Menú de Archivo
+        React.createElement('div', { className: 'dropdown-container' },
+          React.createElement('button', { 
+            className: 'menu-trigger',
+            onClick: () => setOpenFileMenu(!openFileMenu) 
+          }, 'Archivo'),
+          
+          openFileMenu && React.createElement('div', { className: 'dd-menu show', style: { left: 0 } },
+            React.createElement('button', { className: 'dd-item', onClick: () => window.location.href='feed.html' }, '📁 Mis Proyectos'),
+            React.createElement('button', { className: 'dd-item', onClick: onSave }, '💾 Guardar (Ctrl+S)'),
+            React.createElement('button', { className: 'dd-item', onClick: () => setShowExport(true) }, '📤 Exportar Fuente')
+          )
+        )
+      ),
 
-    /* Export modal */
-    showExport && React.createElement(ExportModal, {
-      projectName,
-      onClose: () => setShowExport(false),
-      onExport: handleExport
-    }),
-
-    /* NAV */
-    React.createElement('nav', {
-      style: {
-        height: '52px', padding: '0 20px',
-        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-        borderBottom: '1px solid var(--border)',
-        background: 'var(--nav-bg)', backdropFilter: 'blur(16px)',
-        position: 'sticky', top: 0, zIndex: 40
-      }
-    },
-      React.createElement(Btn, {
-        onClick: onBack,
-        style: {
-          background: 'var(--surface2)', border: '1px solid var(--border)',
-          borderRadius: R_BTN, padding: '7px 13px',
-          color: 'var(--text-muted)', fontSize: '11px', fontFamily: FONT_MONO
-        }
-      }, '← Feed'),
-
-      React.createElement('span', {
-        style: { fontFamily: FONT_PIXEL, fontSize: '11px', color: ACCENT }
-      }, 'CODE SHELF'),
-
-      React.createElement('div', { style: { display: 'flex', gap: '8px', alignItems: 'center' } },
-        React.createElement(Btn, {
-          onClick: toggleTheme,
-          style: {
-            background: 'var(--surface2)', border: '1px solid var(--border)',
-            borderRadius: R_BTN, padding: '7px', display: 'flex', alignItems: 'center'
-          }
-        }, React.createElement(Icon, { name: isDark ? 'sun' : 'moon', size: 16, isDark })),
-
-        React.createElement(Btn, {
-          onClick: () => setShowExport(true),
-          style: {
-            background: ACCENT, borderRadius: R_BTN,
-            padding: '7px 16px', color: '#fff',
-            fontWeight: '700', fontSize: '11px', letterSpacing: '1px', fontFamily: FONT_MONO
-          }
-        }, '↓ EXPORTAR'),
-
-        isSaving && React.createElement('div', {
-          style: {
-            width: '7px', height: '7px', borderRadius: '50%',
-            border: `2px solid ${ACCENT}`, borderTopColor: 'transparent',
-            animation: 'spin 0.8s linear infinite'
-          }
-        })
+      React.createElement('div', { className: 'nav-right' },
+        React.createElement('button', { className: 'nav-btn', onClick: toggleTheme }, isDark ? '🌙' : '☀️'),
+        React.createElement('div', { 
+          className: 'user-avatar', 
+          onClick: () => setOpenUserMenu(!openUserMenu) 
+        }, avatarInit),
+        
+        // Menú de Usuario (Compartido)
+        openUserMenu && React.createElement('div', { className: 'dd-menu show' },
+          React.createElement('button', { className: 'dd-item danger', onClick: () => signOut(auth) }, '🚪 Cerrar Sesión')
+        )
       )
     ),
 
