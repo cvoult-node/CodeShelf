@@ -5,14 +5,6 @@
 import { signOut } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
 import { auth }    from './firebase.js';
 
-const SVG_DELETE = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="none" width="15" height="15">
-  <path d="M2 4h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-  <path d="M5 4V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-  <path d="M4 4l.8 9.2A1 1 0 0 0 5.8 14h4.4a1 1 0 0 0 1-.8L12 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-  <line x1="6.5" y1="7" x2="6.5" y2="11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-  <line x1="9.5" y1="7" x2="9.5" y2="11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-</svg>`;
-
 export function renderFeed(proyectos, onOpen, onDelete) {
   const container = document.getElementById('projects-list');
   if (!container) return;
@@ -47,7 +39,7 @@ export function renderFeed(proyectos, onOpen, onDelete) {
         <div class="card-preview p-preview"></div>
         <div class="card-actions">
           <button class="btn-open">ABRIR</button>
-          <button class="btn-del" title="Eliminar">${SVG_DELETE}</button>
+          <button class="btn-del" title="Eliminar"><img src="src/icons/delete.svg" alt="Agregar"></button>
         </div>
       </div>`;
 
