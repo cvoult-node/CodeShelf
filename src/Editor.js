@@ -1,10 +1,12 @@
 // ─────────────────────────────────────────────
 //  EDITOR — src/Editor.js
 // ─────────────────────────────────────────────
-import React, { useState, useRef, useCallback } from 'https://esm.sh/react@18.2.0';
+import React, { useState, useRef, useCallback, useEffect } from 'https://esm.sh/react@18.2.0';
+import { auth, signOut } from './firebase.js'; // Necesario para el menú de usuario
 import { ACCENT, TECLADO, R_CARD, R_BTN, FONT_MONO, FONT_PIXEL } from './constants.js';
 import { Btn, Icon, Overlay, Modal, Label } from './ui.js';
 import { floodFill, shiftGrid, buildAndDownload } from './canvas.js';
+
 
 // ── Export modal ─────────────────────────────
 const ExportModal = ({ projectName, onClose, onExport }) => {
