@@ -304,19 +304,6 @@ export function EditorPage({
           )
         ),
 
-        /* Save */
-        React.createElement(Btn, {
-          onClick: onSave,
-          style: {
-            width: '100%', maxWidth: '460px', padding: '12px',
-            background: isSaving ? 'var(--surface2)' : ACCENT,
-            borderRadius: R_BTN,
-            color: isSaving ? 'var(--text-muted)' : '#fff',
-            fontWeight: '700', fontSize: '11px', letterSpacing: '2px', fontFamily: FONT_MONO
-          }
-        }, isSaving ? '⏳ GUARDANDO...' : '💾 GUARDAR CAMBIOS')
-      ),
-
       /* ── Characters panel ── */
       React.createElement('aside', {
         style: {
@@ -391,5 +378,5 @@ export function EditorPage({
         )
       )
     )
-  );
-}
+
+
