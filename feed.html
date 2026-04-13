@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="es" class="dark">
+<html lang="es">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -10,402 +10,114 @@
   <link rel="stylesheet" href="src/shared.css">
   <style>
     body {
-      overflow-y: scroll;
-      min-height: 100vh;
+      overflow-y: scroll; min-height: 100vh;
       background-image: radial-gradient(ellipse 60% 40% at 50% 0%, rgba(191,69,69,0.05) 0%, transparent 70%);
     }
 
-    /* ── Feed ── */
-    .feed-container {
-      max-width: 600px;
-      margin: 0 auto;
-      padding: 28px 16px 80px;
-    }
+    /* FEED */
+    .feed-container { max-width: 680px; margin: 0 auto; padding: 28px 16px 80px; }
 
-    .feed-header {
-      display: flex;
-      align-items: baseline;
-      justify-content: space-between;
-      margin-bottom: 22px;
-    }
-    .feed-title {
-      font-family: var(--pixel);
-      font-size: 10px;
-      color: var(--text);
-      letter-spacing: 2px;
-    }
-    .feed-count {
-      font-size: 9px;
-      color: var(--muted);
-      letter-spacing: 2px;
-    }
+    .feed-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 22px; gap: 12px; }
+    .feed-header-left { display: flex; align-items: baseline; gap: 12px; }
+    .feed-title { font-family: var(--pixel); font-size: 10px; color: var(--text); letter-spacing: 2px; }
+    .feed-count { font-size: 9px; color: var(--muted); letter-spacing: 2px; }
 
-    /* ── Nav extra ── */
-    .avatar-circle {
-      width: 32px; height: 32px;
-      border-radius: 50%;
-      border: 1.5px solid var(--accent);
-      background: var(--accent2);
-      cursor: pointer;
-      display: flex; align-items: center; justify-content: center;
-      font-family: var(--pixel);
-      font-size: 9px;
-      color: var(--accent);
-      transition: background .15s;
-    }
-    .avatar-circle:hover { background: rgba(191,69,69,0.18); }
+    /* View toggle */
+    .view-toggle { display: flex; gap: 4px; background: var(--surface2); border: 1px solid var(--border); border-radius: var(--r-btn); padding: 3px; }
+    .view-btn { width: 28px; height: 26px; border: none; background: none; border-radius: 5px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background .13s; }
+    .view-btn img { width: 13px; height: 13px; filter: var(--icon-filter); opacity: .4; transition: opacity .13s; }
+    .view-btn.active { background: var(--surface3); }
+    .view-btn.active img, .view-btn:hover img { opacity: .9; }
 
-    .btn-logout {
-      background: none;
-      border: 1px solid var(--border);
-      border-radius: var(--r-btn);
-      color: var(--muted);
-      font-family: var(--mono);
-      font-size: 9px;
-      letter-spacing: 2px;
-      padding: 6px 12px;
-      cursor: pointer;
-      transition: border-color .15s, color .15s;
-    }
-    .btn-logout:hover { border-color: var(--accent); color: var(--accent); }
-
-    /* ── New project btn ── */
+    /* New project btn */
     .new-project-btn {
-      border: 1px dashed var(--border2);
-      border-radius: var(--r-card);
-      padding: 18px 20px;
-      display: flex;
-      align-items: center;
-      gap: 16px;
-      cursor: pointer;
-      margin-bottom: 18px;
+      border: 1px dashed var(--border2); border-radius: var(--r-card);
+      padding: 16px 20px; display: flex; align-items: center; gap: 16px;
+      cursor: pointer; margin-bottom: 18px;
       transition: border-color .18s, background .18s, transform .12s;
-      background: none;
-      width: 100%;
-      text-align: left;
-      color: var(--text);
-      font-family: var(--mono);
+      background: none; width: 100%; text-align: left; color: var(--text); font-family: var(--mono);
     }
-    .new-project-btn:hover {
-      border-color: var(--accent);
-      background: var(--accent3);
-      transform: translateY(-1px);
-    }
-
-    .plus-square {
-      width: 38px; height: 38px;
-      background: var(--accent);
-      border-radius: var(--r-btn);
-      display: flex; align-items: center; justify-content: center;
-      font-weight: bold; font-size: 20px;
-      flex-shrink: 0;
-      color: #fff;
-      transition: background .15s;
-    }
+    .new-project-btn:hover { border-color: var(--accent); background: var(--accent3); transform: translateY(-1px); }
+    .plus-square { width: 38px; height: 38px; background: var(--accent); border-radius: var(--r-btn); display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: background .15s; }
+    .plus-square img { width: 18px; height: 18px; filter: invert(1); }
     .new-project-btn:hover .plus-square { background: var(--accent-h); }
+    .new-project-sub { font-size: 10px; color: var(--muted); margin-top: 4px; }
 
-    .new-project-sub {
-      font-size: 10px;
-      color: var(--muted);
-      margin-top: 4px;
-      letter-spacing: 0.5px;
-    }
+    /* LIST VIEW (default) */
+    #projects-list { display: flex; flex-direction: column; gap: 12px; }
 
-    /* ── Cards ── */
-    #projects-list {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
+    /* GRID VIEW */
+    #projects-list.grid-view { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
 
-    .card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--r-card);
-      overflow: hidden;
-      transition: border-color .18s, transform .15s, box-shadow .18s;
-      box-shadow: var(--shadow-card);
-    }
-    .card:hover {
-      border-color: var(--border-accent);
-      transform: translateY(-2px);
-      box-shadow: var(--shadow-hover);
-    }
-
-    .card-top-line {
-      height: 2px;
-      background: linear-gradient(90deg, var(--accent), transparent);
-    }
-
-    .card-inner { padding: 18px; }
-
-    .card-header {
-      display: flex;
-      align-items: center;
-      gap: 14px;
-      margin-bottom: 14px;
-    }
-
-    .card-icon {
-      width: 38px; height: 38px;
-      background: var(--accent2);
-      border-radius: 50%;
-      border: 1px solid var(--border-accent);
-      display: flex; align-items: center; justify-content: center;
-      font-family: var(--pixel);
-      font-size: 11px;
-      color: var(--accent);
-      flex-shrink: 0;
-    }
-
+    /* Card */
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-card); overflow: hidden; transition: border-color .18s, transform .15s, box-shadow .18s; box-shadow: var(--shadow-card); }
+    .card:hover { border-color: var(--border-accent); transform: translateY(-2px); box-shadow: var(--shadow-hover); }
+    .card-top-line { height: 2px; background: linear-gradient(90deg, var(--accent), transparent); }
+    .card-inner { padding: 16px; }
+    .card-header { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+    .card-icon { width: 36px; height: 36px; background: var(--accent2); border-radius: 50%; border: 1px solid var(--border-accent); display: flex; align-items: center; justify-content: center; font-family: var(--pixel); font-size: 11px; color: var(--accent); flex-shrink: 0; }
     .p-title { font-weight: 700; font-size: 13px; color: var(--text); }
-    .p-meta  {
-      font-size: 9px;
-      color: var(--muted);
-      letter-spacing: 2px;
-      margin-top: 4px;
-    }
-
-    .card-preview {
-      background: #080610;
-      border-radius: var(--r-btn);
-      padding: 14px;
-      margin-bottom: 14px;
-      display: flex;
-      gap: 10px;
-      min-height: 44px;
-      align-items: center;
-      justify-content: center;
-      border: 1px solid var(--border);
-    }
-
+    .p-meta  { font-size: 9px; color: var(--muted); letter-spacing: 2px; margin-top: 4px; }
+    .card-preview { background: #080610; border-radius: var(--r-btn); padding: 12px; margin-bottom: 12px; display: flex; gap: 10px; min-height: 44px; align-items: center; justify-content: center; border: 1px solid var(--border); }
     .card-actions { display: flex; gap: 8px; }
-
-    .btn-open {
-      flex: 1;
-      background: var(--accent);
-      color: #fff;
-      border: none;
-      border-radius: var(--r-btn);
-      padding: 10px;
-      font-family: var(--mono);
-      font-weight: 700;
-      font-size: 10px;
-      letter-spacing: 2px;
-      cursor: pointer;
-      transition: background .15s, transform .12s;
-    }
+    .btn-open { flex: 1; background: var(--accent); color: #fff; border: none; border-radius: var(--r-btn); padding: 9px; font-family: var(--mono); font-weight: 700; font-size: 10px; letter-spacing: 2px; cursor: pointer; transition: background .15s, transform .12s; }
     .btn-open:hover { background: var(--accent-h); transform: translateY(-1px); }
+    .btn-del { width: 36px; height: 36px; background: transparent; border: 1px solid var(--border); border-radius: var(--r-btn); color: var(--muted2); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background .15s, border-color .15s, color .15s; padding: 0; }
+    .btn-del:hover { background: rgba(191,69,69,0.08); border-color: var(--border-accent); color: var(--accent); }
+    .btn-del svg { pointer-events: none; }
 
-    .btn-del {
-      width: 40px;
-      background: transparent;
-      border: 1px solid var(--border);
-      border-radius: var(--r-btn);
-      color: var(--muted2);
-      cursor: pointer;
-      font-size: 18px;
-      transition: background .15s, border-color .15s, color .15s;
-      display: flex; align-items: center; justify-content: center;
-    }
-    .btn-del:hover {
-      background: rgba(191,69,69,0.08);
-      border-color: var(--border-accent);
-      color: var(--accent);
-    }
+    /* Grid view compact */
+    #projects-list.grid-view .card-inner { padding: 14px; }
+    #projects-list.grid-view .p-title { font-size: 12px; }
+    #projects-list.grid-view .card-preview { padding: 10px; min-height: 36px; }
 
-    /* ── Empty state ── */
-    .empty-state {
-      text-align: center;
-      padding: 70px 20px;
-      color: var(--muted);
-      font-size: 10px;
-      letter-spacing: 3px;
-    }
-    .empty-state span {
-      display: block;
-      font-size: 32px;
-      margin-bottom: 16px;
-      opacity: 0.3;
-    }
+    /* Empty */
+    .empty-state { text-align: center; padding: 70px 20px; color: var(--muted); font-size: 10px; letter-spacing: 3px; grid-column: 1 / -1; }
+    .empty-state span { display: block; font-size: 32px; margin-bottom: 16px; opacity: 0.3; }
 
-    /* ── Modal ── */
-    .modal-overlay {
-      position: fixed; inset: 0;
-      background: rgba(0,0,0,0.72);
-      display: flex; align-items: center; justify-content: center;
-      z-index: 999;
-      padding: 16px;
-      backdrop-filter: blur(8px);
-    }
+    /* MODAL */
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.72); display: flex; align-items: center; justify-content: center; z-index: 999; padding: 16px; backdrop-filter: blur(8px); }
     .modal-overlay.hidden { display: none; }
-
-    .modal-box {
-      background: var(--surface);
-      border: 1px solid var(--border2);
-      border-radius: var(--r-card);
-      padding: 32px 28px;
-      width: 100%;
-      max-width: 340px;
-      box-shadow: 0 32px 80px rgba(0,0,0,0.7);
-    }
-
-    .modal-title {
-      font-family: var(--pixel);
-      font-size: 11px;
-      color: var(--accent);
-      margin-bottom: 8px;
-      letter-spacing: 2px;
-    }
-    .modal-subtitle {
-      font-size: 10px;
-      color: var(--muted);
-      letter-spacing: 1px;
-      margin-bottom: 24px;
-    }
-
-    .modal-input {
-      width: 100%;
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      border-radius: var(--r-btn);
-      padding: 12px 14px;
-      color: var(--text);
-      font-family: var(--mono);
-      font-size: 13px;
-      outline: none;
-      margin-bottom: 8px;
-      transition: border-color .15s, background .15s;
-    }
-    .modal-input:focus {
-      border-color: var(--accent);
-      background: var(--surface3);
-    }
-    .modal-input::placeholder { color: var(--muted); }
-
-    .modal-hint {
-      font-size: 9px;
-      color: var(--muted2);
-      letter-spacing: 1px;
-      margin-bottom: 22px;
-    }
-
+    .modal-box { background: var(--surface); border: 1px solid var(--border2); border-radius: var(--r-card); padding: 32px 28px; width: 100%; max-width: 340px; box-shadow: 0 32px 80px rgba(0,0,0,0.7); }
+    .modal-title { font-family: var(--pixel); font-size: 11px; color: var(--accent); margin-bottom: 8px; letter-spacing: 2px; }
+    .modal-subtitle { font-size: 10px; color: var(--muted); letter-spacing: 1px; margin-bottom: 24px; }
+    .modal-input { width: 100%; background: var(--surface2); border: 1px solid var(--border); border-radius: var(--r-btn); padding: 12px 14px; color: var(--text); font-family: var(--mono); font-size: 13px; outline: none; margin-bottom: 8px; transition: border-color .15s, background .15s; }
+    .modal-input:focus { border-color: var(--accent); background: var(--surface3); }
+    .modal-input::placeholder { color: var(--muted2); }
+    .modal-hint { font-size: 9px; color: var(--muted2); letter-spacing: 1px; margin-bottom: 22px; }
     .modal-actions { display: flex; gap: 8px; }
-
-    .btn-cancel {
-      flex: 1;
-      background: none;
-      border: 1px solid var(--border);
-      border-radius: var(--r-btn);
-      color: var(--muted);
-      font-family: var(--mono);
-      font-size: 10px;
-      letter-spacing: 2px;
-      padding: 11px;
-      cursor: pointer;
-      transition: border-color .15s, color .15s;
-    }
+    .btn-cancel { flex: 1; background: none; border: 1px solid var(--border); border-radius: var(--r-btn); color: var(--muted); font-family: var(--mono); font-size: 10px; letter-spacing: 2px; padding: 11px; cursor: pointer; transition: border-color .15s, color .15s; }
     .btn-cancel:hover { border-color: var(--border2); color: var(--text); }
-
-    .btn-confirm {
-      flex: 2;
-      background: var(--accent);
-      border: none;
-      border-radius: var(--r-btn);
-      color: #fff;
-      font-family: var(--mono);
-      font-weight: 700;
-      font-size: 10px;
-      letter-spacing: 2px;
-      padding: 11px;
-      cursor: pointer;
-      transition: background .15s, transform .12s;
-    }
+    .btn-confirm { flex: 2; background: var(--accent); border: none; border-radius: var(--r-btn); color: #fff; font-family: var(--mono); font-weight: 700; font-size: 10px; letter-spacing: 2px; padding: 11px; cursor: pointer; transition: background .15s, transform .12s; }
     .btn-confirm:hover { background: var(--accent-h); transform: translateY(-1px); }
     .btn-confirm:disabled { opacity: .45; cursor: not-allowed; transform: none; }
 
-    /* ── Auth form (fallback) ── */
-    .auth-screen {
-      min-height: 100vh;
-      display: flex; align-items: center; justify-content: center;
-      padding: 16px;
-    }
-    .auth-box {
-      width: 100%; max-width: 360px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--r-card);
-      padding: 44px 36px 40px;
-      box-shadow: 0 32px 80px rgba(0,0,0,0.6);
-    }
+    /* AUTH FALLBACK */
+    .auth-screen { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 16px; }
+    .auth-box { width: 100%; max-width: 360px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-card); padding: 44px 36px 40px; box-shadow: 0 32px 80px rgba(0,0,0,0.6); }
     .auth-logo { text-align: center; margin-bottom: 36px; }
-    .auth-logo-text {
-      font-family: var(--pixel);
-      font-size: 16px;
-      color: var(--accent);
-      line-height: 2;
-      letter-spacing: 4px;
-    }
-    .auth-tagline {
-      font-size: 7px;
-      letter-spacing: 5px;
-      color: var(--muted);
-      margin-top: 10px;
-    }
+    .auth-logo-text { font-family: var(--pixel); font-size: 16px; color: var(--accent); line-height: 2; letter-spacing: 4px; }
+    .auth-tagline { font-size: 7px; letter-spacing: 5px; color: var(--muted); margin-top: 10px; }
     .auth-form { display: flex; flex-direction: column; gap: 10px; }
-    .auth-input {
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      border-radius: var(--r-btn);
-      padding: 13px 15px;
-      color: var(--text);
-      font-family: var(--mono);
-      font-size: 13px;
-      outline: none;
-      transition: border-color .15s;
-      width: 100%;
-    }
+    .auth-input { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--r-btn); padding: 13px 15px; color: var(--text); font-family: var(--mono); font-size: 13px; outline: none; transition: border-color .15s; width: 100%; }
     .auth-input:focus { border-color: var(--accent); }
     .auth-input::placeholder { color: var(--muted); }
-    .btn-auth {
-      background: var(--accent);
-      color: #fff;
-      border: none;
-      border-radius: var(--r-btn);
-      padding: 14px;
-      font-family: var(--mono);
-      font-weight: 700;
-      font-size: 10px;
-      letter-spacing: 2.5px;
-      cursor: pointer;
-      margin-top: 6px;
-      transition: background .15s;
-    }
+    .btn-auth { background: var(--accent); color: #fff; border: none; border-radius: var(--r-btn); padding: 14px; font-family: var(--mono); font-weight: 700; font-size: 10px; letter-spacing: 2.5px; cursor: pointer; margin-top: 6px; transition: background .15s; }
     .btn-auth:hover { background: var(--accent-h); }
     .auth-divider { display: flex; align-items: center; gap: 12px; margin: 22px 0; }
     .auth-divider-line { flex: 1; height: 1px; background: var(--border); }
     .auth-divider-text { font-size: 9px; letter-spacing: 2px; color: var(--muted); }
-    .btn-google {
-      width: 100%; padding: 13px;
-      background: var(--surface2);
-      border: 1px solid var(--border2);
-      border-radius: var(--r-btn);
-      color: var(--text); font-family: var(--mono);
-      font-size: 11px; font-weight: 700; cursor: pointer;
-      transition: background .15s;
-    }
+    .btn-google { width: 100%; padding: 13px; background: var(--surface2); border: 1px solid var(--border2); border-radius: var(--r-btn); color: var(--text); font-family: var(--mono); font-size: 11px; font-weight: 700; cursor: pointer; transition: background .15s; }
     .btn-google:hover { background: var(--surface3); }
   </style>
 </head>
 <body>
 
-  <!-- ── Loading screen ── -->
   <div id="screen-loading" class="loading-screen">
     <span class="loading-text">CARGANDO...</span>
     <div class="loading-bar"></div>
   </div>
 
-  <!-- ── Auth screen ── -->
   <div id="screen-auth" class="auth-screen hidden">
     <div class="auth-box">
       <div class="auth-logo">
@@ -423,29 +135,85 @@
         <div class="auth-divider-line"></div>
       </div>
       <button class="btn-google" id="btn-google">🔑&nbsp;&nbsp;Continuar con Google</button>
-      <p id="auth-error" style="color:var(--accent);font-size:9px;margin-top:14px;text-align:center;display:none;letter-spacing:1px;"></p>
+      <p id="auth-error" style="color:var(--accent);font-size:9px;margin-top:14px;text-align:center;display:none;"></p>
     </div>
   </div>
 
-  <!-- ── App screen ── -->
   <div id="screen-app" class="hidden">
     <nav class="navbar">
       <span class="navbar-logo" style="cursor:default;">CODESHELF</span>
       <div class="navbar-links">
         <a href="social.html" class="nav-link">EXPLORAR</a>
-        <button class="btn-logout" id="btn-logout">SALIR</button>
-        <div class="avatar-circle" id="avatar">U</div>
+
+        <div class="nav-avatar-wrap">
+          <div class="nav-avatar" id="nav-avatar" tabindex="0" role="button">U</div>
+
+          <div class="nav-dropdown" id="nav-dropdown">
+
+            <div class="dd-user">
+              <div class="dd-avatar-sm" id="dd-avatar-sm">U</div>
+              <div>
+                <div class="dd-user-name"  id="dd-user-name">—</div>
+                <div class="dd-user-email" id="dd-user-email">—</div>
+              </div>
+            </div>
+
+            <div class="dd-section">
+              <div class="dd-label">NAVEGAR</div>
+              <a href="social.html" class="dd-item">
+                <img class="dd-icon" src="src/icons/explore.svg" alt="">Explorar fuentes
+              </a>
+              <a href="feed.html" class="dd-item">
+                <img class="dd-icon" src="src/icons/fonts.svg" alt="">Mis fuentes
+              </a>
+            </div>
+
+            <div class="dd-section">
+              <div class="dd-label">CREAR</div>
+              <button class="dd-item" id="dd-new-font">
+                <img class="dd-icon" src="src/icons/plus.svg" alt="">Nueva fuente
+              </button>
+              <a href="social.html" class="dd-item">
+                <img class="dd-icon" src="src/icons/publish.svg" alt="">Publicaciones
+              </a>
+            </div>
+
+            <div class="dd-section">
+              <div class="dd-label">CUENTA</div>
+              <a href="profile.html" class="dd-item">
+                <img class="dd-icon" src="src/icons/profile.svg" alt="">Mi perfil
+              </a>
+              <button class="dd-item" id="dd-theme">
+                <img class="dd-icon" src="src/icons/theme.svg" alt=""><span id="dd-theme-label">Cambiar tema</span>
+              </button>
+              <button class="dd-item danger" id="dd-logout">
+                <img class="dd-icon" src="src/icons/logout.svg" alt="">Cerrar sesión
+              </button>
+            </div>
+
+          </div>
+        </div>
       </div>
     </nav>
 
     <main class="feed-container">
       <div class="feed-header">
-        <span class="feed-title">MIS FUENTES</span>
-        <span class="feed-count" id="proj-count"></span>
+        <div class="feed-header-left">
+          <span class="feed-title">MIS FUENTES</span>
+          <span class="feed-count" id="proj-count"></span>
+        </div>
+        <div class="view-toggle">
+          <button class="view-btn active" id="btn-view-list" title="Vista lista">
+            <img src="src/icons/list.svg" alt="Lista">
+          </button>
+          <button class="view-btn" id="btn-view-grid" title="Vista mosaico">
+            <img src="src/icons/grid.svg" alt="Mosaico">
+          </button>
+        </div>
       </div>
 
       <button class="new-project-btn" id="btn-new-font">
-        <div class="plus-square">+</div>
+        <div class="plus-square"><img src="src/icons/plus.svg" alt="Agregar"></div>
         <div>
           <p style="font-weight:700;font-size:13px;color:var(--text);">Nueva fuente</p>
           <p class="new-project-sub">Crea un nuevo proyecto de pixel font</p>
@@ -456,13 +224,11 @@
     </main>
   </div>
 
-  <!-- ── Modal nuevo proyecto ── -->
   <div class="modal-overlay hidden" id="modal-overlay">
     <div class="modal-box">
       <p class="modal-title">NUEVA FUENTE</p>
       <p class="modal-subtitle">Ponle un nombre a tu proyecto</p>
-      <input class="modal-input" type="text" id="new-font-name"
-             placeholder="mi-fuente-pixel" maxlength="40">
+      <input class="modal-input" type="text" id="new-font-name" placeholder="mi-fuente-pixel" maxlength="40">
       <p class="modal-hint">Solo letras, números y guiones</p>
       <div class="modal-actions">
         <button class="btn-cancel" id="close-modal">CANCELAR</button>
@@ -471,39 +237,75 @@
     </div>
   </div>
 
-  <!-- ── Card template ── -->
-  <template id="tpl-project">
-    <div class="card">
-      <div class="card-top-line"></div>
-      <div class="card-inner">
-        <div class="card-header">
-          <div class="card-icon">F</div>
-          <div>
-            <div class="p-title">Nombre</div>
-            <div class="p-meta">8PX · 0 GLIFOS</div>
-          </div>
-        </div>
-        <div class="card-preview p-preview"></div>
-        <div class="card-actions">
-          <button class="btn-open">ABRIR</button>
-          <button class="btn-del">×</button>
-        </div>
-      </div>
-    </div>
-  </template>
-
   <script type="module">
     import {
       auth, provider, db,
       signInWithPopup, signOut, onAuthStateChanged,
       signInWithEmailAndPassword, createUserWithEmailAndPassword,
-      doc, setDoc, getDocs, collection, query, orderBy, deleteDoc
+      doc, setDoc, getDoc, getDocs, collection, query, orderBy, deleteDoc
     } from './src/firebase.js';
     import { renderFeed, initFeedEvents } from './src/Feed.js';
 
     const show = id => document.getElementById(id).classList.remove('hidden');
     const hide = id => document.getElementById(id).classList.add('hidden');
 
+    // ── TEMA ──────────────────────────────────────────────────────────────
+    function getTheme() {
+      return localStorage.getItem('cs-theme') ||
+        (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    }
+    function applyTheme(t) {
+      document.documentElement.className = t;
+      localStorage.setItem('cs-theme', t);
+      const lbl = document.getElementById('dd-theme-label');
+      if (lbl) lbl.textContent = t === 'dark' ? 'Tema claro' : 'Tema oscuro';
+    }
+    applyTheme(getTheme());
+
+    document.getElementById('dd-theme').onclick = () => {
+      applyTheme(document.documentElement.className === 'dark' ? 'light' : 'dark');
+      closeDropdown();
+    };
+
+    // ── DROPDOWN ──────────────────────────────────────────────────────────
+    const avatarBtn = document.getElementById('nav-avatar');
+    const dropdown  = document.getElementById('nav-dropdown');
+
+    function openDropdown()  { dropdown.classList.add('open'); avatarBtn.classList.add('open'); }
+    function closeDropdown() { dropdown.classList.remove('open'); avatarBtn.classList.remove('open'); }
+
+    avatarBtn.onclick = (e) => { e.stopPropagation(); dropdown.classList.contains('open') ? closeDropdown() : openDropdown(); };
+    document.addEventListener('click',   e  => { if (!dropdown.contains(e.target) && e.target !== avatarBtn) closeDropdown(); });
+    document.addEventListener('keydown', e  => { if (e.key === 'Escape') closeDropdown(); });
+
+    document.getElementById('dd-new-font').onclick = () => {
+      closeDropdown();
+      document.getElementById('modal-overlay').classList.remove('hidden');
+      document.getElementById('new-font-name').value = '';
+      document.getElementById('new-font-name').focus();
+    };
+    document.getElementById('dd-logout').onclick = () => signOut(auth).then(() => window.location.reload());
+
+    // ── TOGGLE VISTA ──────────────────────────────────────────────────────
+    let currentView = localStorage.getItem('cs-feed-view') || 'list';
+
+    function setView(v) {
+      currentView = v;
+      localStorage.setItem('cs-feed-view', v);
+      const list = document.getElementById('projects-list');
+      const btnL = document.getElementById('btn-view-list');
+      const btnG = document.getElementById('btn-view-grid');
+      if (v === 'grid') {
+        list.classList.add('grid-view'); btnG.classList.add('active'); btnL.classList.remove('active');
+      } else {
+        list.classList.remove('grid-view'); btnL.classList.add('active'); btnG.classList.remove('active');
+      }
+    }
+    setView(currentView);
+    document.getElementById('btn-view-list').onclick = () => setView('list');
+    document.getElementById('btn-view-grid').onclick = () => setView('grid');
+
+    // ── FIRESTORE ─────────────────────────────────────────────────────────
     async function cargarProyectos(user) {
       const q   = query(collection(db, 'usuarios', user.uid, 'proyectos'), orderBy('updatedAt', 'desc'));
       const snp = await getDocs(q);
@@ -511,23 +313,15 @@
     }
 
     function makeCallbacks(user) {
-      const onOpen = (proyecto) => {
-        sessionStorage.setItem('proyectoActivo', JSON.stringify(proyecto));
-        window.location.href = 'editor.html';
-      };
+      const onOpen = (proyecto) => { sessionStorage.setItem('proyectoActivo', JSON.stringify(proyecto)); window.location.href = 'editor.html'; };
       const onDelete = async (id) => {
         await deleteDoc(doc(db, 'usuarios', user.uid, 'proyectos', id));
-        const p = await cargarProyectos(user);
-        renderFeed(p, onOpen, onDelete);
-        updateCount(p.length);
+        const p = await cargarProyectos(user); renderFeed(p, onOpen, onDelete); updateCount(p.length);
       };
       const onCreate = async (nombre, size) => {
-        const id   = Date.now().toString();
-        const ref  = doc(db, 'usuarios', user.uid, 'proyectos', id);
-        await setDoc(ref, { nombre, gridSize: size, font: {}, updatedAt: new Date() });
-        const p = await cargarProyectos(user);
-        renderFeed(p, onOpen, onDelete);
-        updateCount(p.length);
+        const id = Date.now().toString();
+        await setDoc(doc(db, 'usuarios', user.uid, 'proyectos', id), { nombre, gridSize: size, font: {}, updatedAt: new Date() });
+        const p = await cargarProyectos(user); renderFeed(p, onOpen, onDelete); updateCount(p.length);
       };
       return { onOpen, onDelete, onCreate };
     }
@@ -537,44 +331,51 @@
       if (el) el.textContent = `${n} PROYECTO${n !== 1 ? 'S' : ''}`;
     }
 
+    // ── AUTH STATE ────────────────────────────────────────────────────────
     onAuthStateChanged(auth, async (user) => {
       hide('screen-loading');
       if (!user) { show('screen-auth'); return; }
 
-      const avatar = document.getElementById('avatar');
-      if (avatar && user.email) avatar.textContent = user.email[0].toUpperCase();
+      const initial = (user.email || '?')[0].toUpperCase();
+      document.getElementById('nav-avatar').textContent   = initial;
+      document.getElementById('dd-avatar-sm').textContent = initial;
+      document.getElementById('dd-user-email').textContent = user.email || '';
+
+      try {
+        const snap = await getDoc(doc(db, 'usuarios', user.uid, 'config', 'perfil'));
+        const nombre = snap.exists() ? snap.data().displayName : null;
+        const display = nombre || user.email?.split('@')[0] || '—';
+        document.getElementById('dd-user-name').textContent = display;
+        if (nombre) {
+          const ini = nombre[0].toUpperCase();
+          document.getElementById('nav-avatar').textContent   = ini;
+          document.getElementById('dd-avatar-sm').textContent = ini;
+        }
+      } catch {
+        document.getElementById('dd-user-name').textContent = user.email?.split('@')[0] || '—';
+      }
 
       show('screen-app');
-
       const { onOpen, onDelete, onCreate } = makeCallbacks(user);
       const proyectos = await cargarProyectos(user);
       renderFeed(proyectos, onOpen, onDelete);
       updateCount(proyectos.length);
       initFeedEvents(onCreate);
-
-      document.getElementById('btn-logout').onclick = () =>
-        signOut(auth).then(() => window.location.reload());
     });
 
+    // ── AUTH FORM ────────────────────────────────────────────────────────
     document.getElementById('auth-form').addEventListener('submit', async (e) => {
       e.preventDefault();
-      const email    = document.getElementById('auth-email').value.trim();
-      const password = document.getElementById('auth-password').value;
-      const errEl    = document.getElementById('auth-error');
+      const email = document.getElementById('auth-email').value.trim();
+      const pass  = document.getElementById('auth-password').value;
+      const errEl = document.getElementById('auth-error');
       errEl.style.display = 'none';
-      try {
-        await signInWithEmailAndPassword(auth, email, password);
-      } catch {
-        try { await createUserWithEmailAndPassword(auth, email, password); }
-        catch (err) { errEl.textContent = err.message; errEl.style.display = 'block'; }
-      }
+      try { await signInWithEmailAndPassword(auth, email, pass); }
+      catch { try { await createUserWithEmailAndPassword(auth, email, pass); } catch (err) { errEl.textContent = err.message; errEl.style.display = 'block'; } }
     });
 
     document.getElementById('btn-google').onclick = () =>
-      signInWithPopup(auth, provider).catch(err => {
-        const errEl = document.getElementById('auth-error');
-        errEl.textContent = err.message; errEl.style.display = 'block';
-      });
+      signInWithPopup(auth, provider).catch(err => { const e = document.getElementById('auth-error'); e.textContent = err.message; e.style.display = 'block'; });
   </script>
 </body>
 </html>
