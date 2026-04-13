@@ -4,67 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Codeshelf | Editor</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Press+Start+2P&display=swap" rel="stylesheet">
-  <style>
-    :root {
-      --bg:         #0a0810;
-      --surface:    #110f1c;
-      --surface2:   #1c1a2a;
-      --surface3:   #252336;
-      --accent:     #bf4545;
-      --accent-h:   #d45555;
-      --accent2:    rgba(191,69,69,0.10);
-      --border:     rgba(200,185,230,0.07);
-      --border2:    rgba(200,185,230,0.14);
-      --border-accent: rgba(191,69,69,0.28);
-      --text:       #eae5f5;
-      --text-muted: #7e7894;
-      --nav-bg:     rgba(10,8,16,0.88);
-      --font-mono:  'Space Mono', monospace;
-      --font-pixel: 'Press Start 2P', cursive;
-    }
-
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-
-    html, body, #root {
-      height: 100%;
-      background: var(--bg);
-      color: var(--text);
-      font-family: var(--font-mono);
-      -webkit-font-smoothing: antialiased;
-    }
-
-    /* Loading fallback */
-    #root:empty::after {
-      content: 'CARGANDO...';
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      height: 100vh;
-      font-family: var(--font-pixel);
-      font-size: 10px;
-      color: var(--accent);
-      letter-spacing: 4px;
-      animation: cs-pulse 1.4s infinite;
-    }
-    @keyframes cs-pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
-
-    /* Scrollbar */
-    ::-webkit-scrollbar { width: 4px; height: 4px; }
-    ::-webkit-scrollbar-track { background: transparent; }
-    ::-webkit-scrollbar-thumb {
-      background: rgba(200,185,230,0.12);
-      border-radius: 2px;
-    }
-    ::-webkit-scrollbar-thumb:hover {
-      background: rgba(200,185,230,0.2);
-    }
-
-    /* Spinner for saving indicator */
-    @keyframes spin { to { transform: rotate(360deg); } }
-  </style>
+  <link rel="stylesheet" href="src/shared.css">
 </head>
 <body>
   <div id="root"></div>
