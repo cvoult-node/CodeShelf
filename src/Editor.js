@@ -352,7 +352,7 @@ export function EditorPage({
         /* Toolbar */
         React.createElement('div', {
           style: {
-            display: 'flex', gap: '4px', alignItems: 'center', flexWrap: 'wrap',
+            display: 'flex', gap: '1px', alignItems: 'center', flexWrap: 'wrap',
             padding: '8px', background: 'var(--surface2)', borderRadius: R_CARD,
             border: '1px solid var(--border)', width: '100%'
           }
@@ -365,10 +365,9 @@ export function EditorPage({
               title: t.label,
               style: {
                 ...toolbarBase,
-                background: tool === t.id ? ACCENT : 'var(--surface)',
-                border: tool === t.id ? 'none' : '1px solid var(--border)',
+                background: tool === t.id ? ACCENT : 'transparent',
+                border: tool === t.id ? 'none' : 'none',
                 color: tool === t.id ? '#fff' : 'var(--muted)',
-                boxShadow: tool === t.id ? `0 3px 10px ${ACCENT}40` : 'none',
               }
             },
               React.createElement('img', {
