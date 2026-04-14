@@ -397,7 +397,7 @@ export function EditorPage({
                 src: `./src/icons/${t.iconName}.svg`, width: 15, height: 15,
                 style: { filter: 'var(--icon-filter)', opacity: .65 }
               }),
-              React.createElement('span', { style: { fontSize: '6px', letterSpacing: '1px' } }, t.label)
+              React.createElement('span', { style: { fontSize: '8px', letterSpacing: '1px' } }, t.label)
             )
           ),
         ),
