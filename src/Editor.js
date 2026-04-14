@@ -315,7 +315,7 @@ export function EditorPage({
     /* ── MAIN LAYOUT ─────────────────────── */
     React.createElement('main', {
       style: {
-        padding: '20px', maxWidth: '900px', margin: '0 auto', width: '100%',
+        padding: '20px', maxWidth: '1050px', margin: '0 auto', width: '100%',
         display: 'grid', gridTemplateColumns: '1fr 400px', gap: '18px', alignItems: 'start'
       }
     },
