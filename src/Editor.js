@@ -375,7 +375,7 @@ export function EditorPage({
                 src: `./src/icons/${t.iconName}.svg`, width: 15, height: 15,
                 style: { filter: tool === t.id ? 'invert(1)' : 'var(--icon-filter)', opacity: tool === t.id ? 1 : .65 }
               }),
-              React.createElement('span', { style: { fontSize: '6px', letterSpacing: '1px' } }, t.label)
+              React.createElement('span', { style: { fontSize: '8px', letterSpacing: '1px' } }, t.label)
             )
           ),
 
