@@ -400,6 +400,7 @@ export function EditorPage({
               React.createElement('span', { style: { fontSize: '6px', letterSpacing: '1px' } }, t.label)
             )
           ),
+        ),
 
         /* Pixel canvas */
         React.createElement('div', {
