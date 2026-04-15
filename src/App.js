@@ -61,14 +61,41 @@ function App() {
   // Para reemplazar confirm() nativo con modal personalizado
   const [confirmDialog, setConfirmDialog] = useState(null); // { message, onConfirm }
 
-  // ── Undo / Redo ──────────────────────────────
-  const undoStack = useRef([]);   // array de snapshots { char, grid }
+  const isDrawing = useRef(false);
+  const drawMode  = useRef(true);
+  const debouncedSaveTimer = useRef(null);
+  const undoStack = useRef([]);
   const redoStack = useRef([]);
 
+  const handleSaveFont = useCallback(async (data) => {
+    if (!user || !proyectoActivo) return;
+    setIsSaving(true);
+    try {
+      await setDoc(
+        doc(db, 'usuarios', user.uid, 'proyectos', proyectoActivo),
+        { font: data, gridSize, updatedAt: new Date() },
+        { merge: true }
+      );
+      const raw = sessionStorage.getItem('proyectoActivo');
+      if (raw) {
+        const p = JSON.parse(raw);
+        sessionStorage.setItem('proyectoActivo', JSON.stringify({ ...p, font: data, gridSize }));
+      }
+    } catch (err) { console.error(err); alert('Error al guardar'); }
+    setIsSaving(false);
+  }, [user, proyectoActivo, gridSize]);
+
+  // -- Debounce save: evita Firestore en cada pixel al dibujar
+  const scheduleSave = useCallback((data) => {
+    clearTimeout(debouncedSaveTimer.current);
+    debouncedSaveTimer.current = setTimeout(() => handleSaveFont(data), 800);
+  }, [handleSaveFont]);
+
+  // -- Undo / Redo (pila de hasta 50 pasos por sesion)
   const pushHistory = useCallback((char, g) => {
     undoStack.current.push({ char, grid: [...g] });
-    if (undoStack.current.length > 50) undoStack.current.shift(); // máx 50 pasos
-    redoStack.current = []; // nueva acción borra el redo
+    if (undoStack.current.length > 50) undoStack.current.shift();
+    redoStack.current = [];
   }, []);
 
   const handleUndo = useCallback(() => {
@@ -97,59 +124,6 @@ function App() {
     });
   }, [currentChar, fontData, scheduleSave]);
 
-  const isDrawing = useRef(false);
-  const drawMode  = useRef(true);
-  // Debounce: evita escribir a Firestore en cada pixel mientras se dibuja
-  const debouncedSaveTimer = useRef(null);
-  const scheduleSave = useCallback((data) => {
-    clearTimeout(debouncedSaveTimer.current);
-    debouncedSaveTimer.current = setTimeout(() => handleSaveFont(data), 800);
-  }, [handleSaveFont]);
-
-  // ── Init ────────────────────────────────────
-  useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (u) => {
-      if (!u) { window.location.replace('feed.html'); return; }
-      const raw = sessionStorage.getItem('proyectoActivo');
-      if (!raw) { window.location.replace('feed.html'); return; }
-      try {
-        const p = JSON.parse(raw);
-        if (!p || !p.id) throw new Error('Proyecto sin id');
-        setUser(u);
-        setProyectoActivo(p.id);
-        setProyectoNombre(p.nombre || 'mi-fuente');
-        setGridSize(p.gridSize || 8);
-        setFontData(p.font || {});
-        setGrid((p.font?.['A']) ? p.font['A'] : Array((p.gridSize || 8) * (p.gridSize || 8)).fill(false));
-        setCurrentChar('A');
-        setStatus('ready');
-      } catch (e) {
-        setErrorMsg('Proyecto inválido. Volviendo...');
-        setStatus('error');
-        setTimeout(() => window.location.replace('feed.html'), 2000);
-      }
-    });
-    return unsub;
-  }, []);
-
-  // ── Save ────────────────────────────────────
-  const handleSaveFont = useCallback(async (data) => {
-    if (!user || !proyectoActivo) return;
-    setIsSaving(true);
-    try {
-      await setDoc(
-        doc(db, 'usuarios', user.uid, 'proyectos', proyectoActivo),
-        { font: data, gridSize, updatedAt: new Date() },
-        { merge: true }
-      );
-      const raw = sessionStorage.getItem('proyectoActivo');
-      if (raw) {
-        const p = JSON.parse(raw);
-        sessionStorage.setItem('proyectoActivo', JSON.stringify({ ...p, font: data, gridSize }));
-      }
-    } catch (err) { console.error(err); alert('Error al guardar'); }
-    setIsSaving(false);
-  }, [user, proyectoActivo, gridSize]);
 
   // ── Publish ─────────────────────────────────
   const handlePublish = useCallback(async (prevText) => {
