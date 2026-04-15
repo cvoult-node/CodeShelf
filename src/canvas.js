@@ -62,28 +62,48 @@ export function buildAndDownload(fontData, gridSize, filename, format, meta = {}
   } = meta;
 
   const S = 100;
-  const baseAdvance = gridSize * S + letterSpacing * 10;
+  const pxSpacing = Math.round(letterSpacing * 10);
+
+  const getGlyphBounds = (glyph = []) => {
+    let minCol = gridSize, maxCol = -1;
+    glyph.forEach((on, i) => {
+      if (!on) return;
+      const col = i % gridSize;
+      if (col < minCol) minCol = col;
+      if (col > maxCol) maxCol = col;
+    });
+    if (maxCol < 0) return null;
+    return { minCol, maxCol, widthCols: (maxCol - minCol + 1) };
+  };
 
   const glyphs = [
-    new ot.Glyph({ name: '.notdef', unicode: 0, advanceWidth: baseAdvance, path: new ot.Path() })
+    new ot.Glyph({ name: '.notdef', unicode: 0, advanceWidth: gridSize * S, path: new ot.Path() })
   ];
 
   Object.keys(fontData).forEach(char => {
+    const glyphGrid = fontData[char] || [];
+    const bounds = getGlyphBounds(glyphGrid);
     const path = new ot.Path();
-    (fontData[char] || []).forEach((on, i) => {
+    glyphGrid.forEach((on, i) => {
       if (!on) return;
-      const x = (i % gridSize) * S;
+      const col = i % gridSize;
+      const x = ((bounds ? (col - bounds.minCol) : col)) * S;
       const y = (gridSize - 1 - Math.floor(i / gridSize)) * S;
       path.moveTo(x, y); path.lineTo(x+S, y);
       path.lineTo(x+S, y+S); path.lineTo(x, y+S);
       path.close();
     });
+
+    const glyphWidth = bounds ? (bounds.widthCols * S) : S;
+    const onePixelPadding = S;
+    const minAdvance = S;
     const advance = char === ' '
-      ? Math.max(200, gridSize * 60 + wordSpacing * 10)
-      : baseAdvance;
+      ? Math.max(minAdvance, onePixelPadding + Math.round(wordSpacing * 10))
+      : Math.max(minAdvance, glyphWidth + onePixelPadding + pxSpacing);
+
     glyphs.push(new ot.Glyph({
       name: char === ' ' ? 'space' : char,
-      unicode: char.charCodeAt(0),
+      unicode: char.codePointAt(0),
       advanceWidth: advance,
       path
     }));

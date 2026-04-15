@@ -8,21 +8,40 @@ import { Btn, Icon, Overlay, Modal, Label } from './ui.js';
 import { buildAndDownload } from './canvas.js';
 
 // ── Pixel preview helper ──────────────────────
+ codex/improve-editor.html-to-handle-8x8-spaces-psgjmi
+const PixelPreview = ({
+  text, fontData, gridSize, pixelSize = 3, color = ACCENT, showSpaceMarker = false,
+  letterSpacing = 0, wordSpacing = 10
+}) => {
+
 const PixelPreview = ({ text, fontData, gridSize, pixelSize = 3, color = ACCENT, showSpaceMarker = false }) => {
+main
   const chars = text.split('');
   const sz = Math.min(gridSize, 32);
   return React.createElement('div', {
-    style: { display: 'flex', gap: '4px', flexWrap: 'wrap', padding: '8px', minHeight: '28px' }
+    style: { display: 'flex', gap: '0px', flexWrap: 'wrap', padding: '8px', minHeight: '28px', alignItems: 'center' }
   },
     chars.map((ch, ci) => {
       const glyph = fontData[ch];
       const isSpace = ch === ' ';
+codex/improve-editor.html-to-handle-8x8-spaces-psgjmi
+      const spacingPx = (isSpace ? wordSpacing : letterSpacing) * 0.22;
+      const minSpaceWidth = Math.max(pixelSize * 2, 1);
+      const computedSpaceWidth = Math.max(minSpaceWidth, pixelSize * 3 + wordSpacing * 0.2);
+
+ main
       return React.createElement('div', {
         key: ci,
         style: {
           display: 'grid',
           gridTemplateColumns: `repeat(${sz},${pixelSize}px)`,
           position: 'relative',
+codex/improve-editor.html-to-handle-8x8-spaces-psgjmi
+          width: isSpace ? `${computedSpaceWidth}px` : undefined,
+          minWidth: isSpace ? `${minSpaceWidth}px` : undefined,
+          marginRight: `${spacingPx}px`,
+
+main
           border: (isSpace && showSpaceMarker) ? '1px dashed var(--border)' : 'none',
           borderRadius: '4px',
           padding: (isSpace && showSpaceMarker) ? '2px' : 0
@@ -107,7 +126,12 @@ const ExportModal = ({ projectName, fontData, gridSize, previewText: externalPre
           style: { fontFamily: FONT_MONO, fontSize: '8px', color: 'var(--muted)', letterSpacing: '2px', marginBottom: '10px' }
         }, 'PREVIEW'),
         React.createElement(PixelPreview, {
+codex/improve-editor.html-to-handle-8x8-spaces-psgjmi
+          text: PREVIEW_TEXT, fontData, gridSize, pixelSize: 4, color: ACCENT, showSpaceMarker,
+          letterSpacing, wordSpacing
+
           text: PREVIEW_TEXT, fontData, gridSize, pixelSize: 4, color: ACCENT, showSpaceMarker
+main
         })
       ),
 
@@ -150,7 +174,7 @@ const ExportModal = ({ projectName, fontData, gridSize, previewText: externalPre
             React.createElement('span', { style: { fontFamily: FONT_MONO, fontSize: '12px', color: ACCENT, minWidth: '32px', textAlign: 'right' } }, letterSpacing)
           ),
           React.createElement('input', {
-            type: 'range', min: 0, max: 30, value: letterSpacing,
+            type: 'range', min: -30, max: 50, value: letterSpacing,
             onChange: e => setLetterSpacing(Number(e.target.value)),
             style: sliderStyle
           })
@@ -165,7 +189,7 @@ const ExportModal = ({ projectName, fontData, gridSize, previewText: externalPre
             React.createElement('span', { style: { fontFamily: FONT_MONO, fontSize: '12px', color: ACCENT, minWidth: '32px', textAlign: 'right' } }, wordSpacing)
           ),
           React.createElement('input', {
-            type: 'range', min: 0, max: 50, value: wordSpacing,
+            type: 'range', min: -30, max: 80, value: wordSpacing,
             onChange: e => setWordSpacing(Number(e.target.value)),
             style: sliderStyle
           })
@@ -359,6 +383,61 @@ const PublishModal = ({ projectName, fontData, gridSize, onClose, onPublish, isP
   );
 };
 
+// ── Preferences modal ─────────────────────────
+const PreferencesModal = ({ onClose, showGuides, setShowGuides, showSpaceMarker, setShowSpaceMarker }) =>
+  React.createElement(Overlay, { onClose },
+    React.createElement(Modal, { style: { maxWidth: '460px', gap: '16px' } },
+      React.createElement('h3', {
+        style: { margin: 0, fontFamily: FONT_PIXEL, fontSize: '10px', color: ACCENT, letterSpacing: '2px' }
+      }, 'PREFERENCIAS DEL EDITOR'),
+      React.createElement('p', {
+        style: { margin: 0, fontFamily: FONT_MONO, fontSize: '10px', color: 'var(--muted)', lineHeight: '1.6' }
+      }, 'Configura cómo se muestran las guías y los marcadores visuales mientras dibujas.'),
+      React.createElement('div', { style: { display: 'grid', gap: '10px' } },
+        [
+          {
+            id: 'guides',
+            title: 'Mostrar guías del canvas',
+            desc: 'Incluye subcuadrícula y línea base para alinear los glifos.',
+            val: showGuides,
+            setVal: setShowGuides
+          },
+          {
+            id: 'space',
+            title: 'Mostrar marcador de espacio',
+            desc: 'Dibuja una línea de referencia para que el glifo espacio no sea invisible.',
+            val: showSpaceMarker,
+            setVal: setShowSpaceMarker
+          }
+        ].map(item =>
+          React.createElement('button', {
+            key: item.id,
+            onClick: () => item.setVal(v => !v),
+            style: {
+              width: '100%', textAlign: 'left',
+              background: item.val ? 'rgba(191,69,69,0.1)' : 'var(--surface2)',
+              border: item.val ? '1px solid rgba(191,69,69,0.35)' : '1px solid var(--border)',
+              borderRadius: R_BTN, padding: '11px 12px', cursor: 'pointer'
+            }
+          },
+            React.createElement('div', {
+              style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }
+            },
+              React.createElement('span', { style: { fontFamily: FONT_MONO, fontSize: '11px', color: 'var(--text)' } }, item.title),
+              React.createElement('span', {
+                style: { fontFamily: FONT_MONO, fontSize: '10px', color: item.val ? ACCENT : 'var(--muted)' }
+              }, item.val ? 'ACTIVO' : 'INACTIVO')
+            ),
+            React.createElement('div', {
+              style: { fontFamily: FONT_MONO, fontSize: '9px', color: 'var(--muted2)', lineHeight: 1.5 }
+            }, item.desc)
+          )
+        )
+      ),
+      React.createElement(Btn, { onClick: onClose, style: { alignSelf: 'flex-end' } }, 'Listo')
+    )
+  );
+
 // ── Guide overlay SVG ─────────────────────────
 const GuideOverlay = ({ gridSize }) => {
   const step = gridSize <= 8 ? 4 : gridSize <= 16 ? 4 : 8;
@@ -386,6 +465,13 @@ const GuideOverlay = ({ gridSize }) => {
     React.createElement('line', {
       key: 'hc', x1: '0', y1: `${mid}%`, x2: '100%', y2: `${mid}%`,
       stroke: 'rgba(191,69,69,0.55)', strokeWidth: '1.5'
+    })
+  );
+  const baseline = (((gridSize - 1) / gridSize) * 100).toFixed(4);
+  lines.push(
+    React.createElement('line', {
+      key: 'baseline', x1: '0', y1: `${baseline}%`, x2: '100%', y2: `${baseline}%`,
+      stroke: 'rgba(191,69,69,0.95)', strokeWidth: '1.8'
     })
   );
   return React.createElement('svg', {
@@ -421,6 +507,7 @@ export function EditorPage({
 }) {
   const [showExport,    setShowExport]    = useState(false);
   const [showPublish,   setShowPublish]   = useState(false);
+  const [showPrefs,     setShowPrefs]     = useState(false);
   const [openFileMenu,  setOpenFileMenu]  = useState(false);
   const [openUserMenu,  setOpenUserMenu]  = useState(false);
   const [avatarColor,   setAvatarColor]   = useState(ACCENT);
@@ -518,6 +605,7 @@ export function EditorPage({
             [
               { icon: 'fonts',   label: 'Mis proyectos',    fn: onBack },
               { icon: 'save',    label: `Guardar  (Ctrl+S)`, fn: onSave },
+              { icon: 'theme',   label: 'Preferencias',      fn: () => { setShowPrefs(true); setOpenFileMenu(false); } },
               { icon: 'export',  label: 'Exportar fuente',   fn: () => { setShowExport(true); setOpenFileMenu(false); } },
               { icon: 'publish', label: 'Publicar en galería', fn: () => { setShowPublish(true); setOpenFileMenu(false); } },
             ].map(({ icon, label, fn }) =>
@@ -551,23 +639,6 @@ export function EditorPage({
         isSaving && React.createElement('span', {
           style: { fontFamily: FONT_MONO, fontSize: '9px', color: 'var(--muted2)', letterSpacing: '2px' }
         }, 'GUARDANDO...'),
-
-        // Guides toggle button
-        React.createElement('button', {
-          onClick: () => setShowGuides(v => !v),
-          title: showGuides ? 'Ocultar guías' : 'Mostrar guías',
-          style: {
-            height: '32px', padding: '0 10px', borderRadius: R_BTN,
-            background: showGuides ? ACCENT : 'var(--surface2)',
-            border: showGuides ? 'none' : '1px solid var(--border)',
-            cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px',
-            fontFamily: FONT_MONO, fontSize: '8px', letterSpacing: '1px',
-            color: showGuides ? '#fff' : 'var(--muted)', transition: 'all .15s'
-          }
-        },
-          React.createElement(ToolIcon, { name: 'guides', size: 14, active: showGuides }),
-          'GUÍAS'
-        ),
 
         React.createElement('button', {
           onClick: () => setShowSpaceMarker(v => !v),
@@ -690,6 +761,10 @@ export function EditorPage({
             React.createElement('div', {
               style: { fontFamily: FONT_MONO, fontSize: '11px', color: 'var(--text)', letterSpacing: '1px' }
             }, `U+${(currentChar.codePointAt(0) || 0).toString(16).toUpperCase().padStart(4,'0')} · Grid ${gridSize}×${gridSize}`)
+            ,
+            (currentChar === ' ' && showSpaceMarker) && React.createElement('div', {
+              style: { fontFamily: FONT_MONO, fontSize: '9px', color: 'var(--muted2)', letterSpacing: '1px', marginTop: '4px' }
+            }, 'Marcador de espacio activo')
           )
         ),
 
@@ -939,6 +1014,14 @@ export function EditorPage({
       isPublishing, published: publishedOk,
       onClose: () => { setShowPublish(false); onResetPublish && onResetPublish(); },
       onPublish: (prevText) => onPublish && onPublish(prevText)
+    }),
+
+    showPrefs && React.createElement(PreferencesModal, {
+      onClose: () => setShowPrefs(false),
+      showGuides,
+      setShowGuides,
+      showSpaceMarker,
+      setShowSpaceMarker
     })
   );
 }
