@@ -22,13 +22,16 @@ import {
   deleteDoc 
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
+// ⚠️  NO pongas credenciales aquí directamente.
+// Copia .env.example → .env y rellena tus valores.
+// En producción, configura estas variables en tu plataforma de hosting.
 const firebaseConfig = {
-    apiKey: "AIzaSyAR4AkM8MaQBqA1MDUyQf5UeCqSntdiz70",
-    authDomain: "codeshelf-c.firebaseapp.com",
-    projectId: "codeshelf-c",
-    storageBucket: "codeshelf-c.firebasestorage.app",
-    messagingSenderId: "688503183462",
-    appId: "1:688503183462:web:a2f3e945dc7b8bbca0b5a7"
+  apiKey:            import.meta.env?.VITE_FIREBASE_API_KEY            ?? window.__ENV__?.FIREBASE_API_KEY,
+  authDomain:        import.meta.env?.VITE_FIREBASE_AUTH_DOMAIN        ?? window.__ENV__?.FIREBASE_AUTH_DOMAIN,
+  projectId:         import.meta.env?.VITE_FIREBASE_PROJECT_ID         ?? window.__ENV__?.FIREBASE_PROJECT_ID,
+  storageBucket:     import.meta.env?.VITE_FIREBASE_STORAGE_BUCKET     ?? window.__ENV__?.FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env?.VITE_FIREBASE_MESSAGING_SENDER_ID ?? window.__ENV__?.FIREBASE_MESSAGING_SENDER_ID,
+  appId:             import.meta.env?.VITE_FIREBASE_APP_ID             ?? window.__ENV__?.FIREBASE_APP_ID,
 };
 
 const app = initializeApp(firebaseConfig);

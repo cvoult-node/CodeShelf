@@ -42,7 +42,14 @@ export function shiftGrid(grid, size, dir) {
  */
 export function buildAndDownload(fontData, gridSize, filename, format, meta = {}) {
   const ot = window.__opentype__;
-  if (!ot) { console.error('opentype not found'); return; }
+  if (!ot) {
+    throw new Error('La librería de fuentes no está lista. Recarga la página.');
+  }
+
+  const hasGlyphs = Object.values(fontData).some(g => Array.isArray(g) && g.some(Boolean));
+  if (!hasGlyphs) {
+    throw new Error('Dibuja al menos un carácter antes de exportar.');
+  }
 
   const {
     fontName      = filename,

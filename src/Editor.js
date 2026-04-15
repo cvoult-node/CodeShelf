@@ -35,7 +35,7 @@ const PixelPreview = ({ text, fontData, gridSize, pixelSize = 3, color = ACCENT 
 };
 
 // ── Export modal ──────────────────────────────
-const ExportModal = ({ projectName, fontData, gridSize, onClose, onExport }) => {
+const ExportModal = ({ projectName, fontData, gridSize, previewText: externalPreviewText, onClose, onExport }) => {
   const [filename,      setFilename]      = useState(projectName || 'mi-fuente');
   const [fontName,      setFontName]      = useState(projectName || 'mi-fuente');
   const [author,        setAuthor]        = useState('');
@@ -47,8 +47,7 @@ const ExportModal = ({ projectName, fontData, gridSize, onClose, onExport }) => 
   const [ascender,      setAscender]      = useState(800);
   const [descender,     setDescender]     = useState(-200);
 
-  const LOREM = 'Lorem ipsum\ndolor sit';
-  const PREVIEW_TEXT = 'ABCDE abcde 0123';
+  const PREVIEW_TEXT = externalPreviewText || 'ABCDE abcde 0123';
 
   const inputStyle = {
     background: 'var(--surface2)', border: '1px solid var(--border)',
@@ -401,6 +400,7 @@ export function EditorPage({
   tool, setTool, previewText, setPreviewText,
   onPixelDown, onPixelEnter, onMouseUp,
   onSwitchChar, onClearCanvas, onInvert, onShift, onSave,
+  onUndo, onRedo,
   onBack, onPublish, projectName,
   isPublishing, publishedOk, onResetPublish
 }) {
@@ -438,11 +438,13 @@ export function EditorPage({
   ];
 
   const actionTools = [
+    { iconName: 'arrow-left',  label: 'UNDO',   fn: onUndo,   title: 'Deshacer (Ctrl+Z)' },
+    { iconName: 'arrow-right', label: 'REDO',   fn: onRedo,   title: 'Rehacer (Ctrl+Y)'  },
     { iconName: 'invert',      label: 'INV',    fn: onInvert },
     { iconName: 'arrow-up',    label: 'ARRIBA', fn: () => onShift('up')    },
     { iconName: 'arrow-down',  label: 'ABAJO',  fn: () => onShift('down')  },
-    { iconName: 'arrow-left',  label: 'IZQ',    fn: () => onShift('left')  },
-    { iconName: 'arrow-right', label: 'DER',    fn: () => onShift('right') },
+    { iconName: 'mirror-h',    label: 'IZQ',    fn: () => onShift('left')  },
+    { iconName: 'mirror-v',    label: 'DER',    fn: () => onShift('right') },
   ];
 
   const toolbarBase = {
@@ -851,6 +853,7 @@ export function EditorPage({
     // Modals
     showExport && React.createElement(ExportModal, {
       projectName, fontData, gridSize,
+      previewText,
       onClose: () => setShowExport(false),
       onExport: (filename, format, meta) => {
         buildAndDownload(fontData, gridSize, filename, format, meta);

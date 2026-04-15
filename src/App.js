@@ -10,8 +10,28 @@ import { ACCENT, FONT_MONO, FONT_PIXEL } from './constants.js';
 import { floodFill, shiftGrid } from './canvas.js';
 import { EditorPage } from './Editor.js';
 import { publishFont } from './publish.js';
+import { Overlay, Modal, Btn } from './ui.js';
 
 window.__opentype__ = opentype;
+
+// ── ConfirmDialog — reemplaza confirm() nativo ─────────────────
+function ConfirmDialog({ message, onConfirm, onCancel }) {
+  return React.createElement(Overlay, { onClose: onCancel },
+    React.createElement(Modal, { style: { maxWidth: '320px', gap: '20px' } },
+      React.createElement('p', {
+        style: { fontFamily: FONT_MONO, fontSize: '13px', color: 'var(--text)', lineHeight: 1.5, margin: 0 }
+      }, message),
+      React.createElement('div', { style: { display: 'flex', gap: '8px', justifyContent: 'flex-end' } },
+        React.createElement(Btn, { onClick: onCancel,
+          style: { background: 'transparent', border: '1px solid var(--border)', color: 'var(--muted)', fontSize: '12px', padding: '6px 14px' }
+        }, 'Cancelar'),
+        React.createElement(Btn, { onClick: onConfirm,
+          style: { background: '#E24B4A', border: 'none', color: '#fff', fontSize: '12px', padding: '6px 14px' }
+        }, 'Confirmar')
+      )
+    )
+  );
+}
 
 function App() {
   // ── Theme ──────────────────────────────────
@@ -38,9 +58,53 @@ function App() {
   const [previewText,   setPreviewText]   = useState('CodeShelf');
   const [isPublishing,  setIsPublishing]  = useState(false);
   const [publishedOk,   setPublishedOk]   = useState(false);
+  // Para reemplazar confirm() nativo con modal personalizado
+  const [confirmDialog, setConfirmDialog] = useState(null); // { message, onConfirm }
+
+  // ── Undo / Redo ──────────────────────────────
+  const undoStack = useRef([]);   // array de snapshots { char, grid }
+  const redoStack = useRef([]);
+
+  const pushHistory = useCallback((char, g) => {
+    undoStack.current.push({ char, grid: [...g] });
+    if (undoStack.current.length > 50) undoStack.current.shift(); // máx 50 pasos
+    redoStack.current = []; // nueva acción borra el redo
+  }, []);
+
+  const handleUndo = useCallback(() => {
+    const prev = undoStack.current.pop();
+    if (!prev) return;
+    redoStack.current.push({ char: currentChar, grid: [...(fontData[currentChar] || [])] });
+    setCurrentChar(prev.char);
+    setGrid(prev.grid);
+    setFontData(fd => {
+      const nfd = { ...fd, [prev.char]: prev.grid };
+      scheduleSave(nfd);
+      return nfd;
+    });
+  }, [currentChar, fontData, scheduleSave]);
+
+  const handleRedo = useCallback(() => {
+    const next = redoStack.current.pop();
+    if (!next) return;
+    undoStack.current.push({ char: currentChar, grid: [...(fontData[currentChar] || [])] });
+    setCurrentChar(next.char);
+    setGrid(next.grid);
+    setFontData(fd => {
+      const nfd = { ...fd, [next.char]: next.grid };
+      scheduleSave(nfd);
+      return nfd;
+    });
+  }, [currentChar, fontData, scheduleSave]);
 
   const isDrawing = useRef(false);
   const drawMode  = useRef(true);
+  // Debounce: evita escribir a Firestore en cada pixel mientras se dibuja
+  const debouncedSaveTimer = useRef(null);
+  const scheduleSave = useCallback((data) => {
+    clearTimeout(debouncedSaveTimer.current);
+    debouncedSaveTimer.current = setTimeout(() => handleSaveFont(data), 800);
+  }, [handleSaveFont]);
 
   // ── Init ────────────────────────────────────
   useEffect(() => {
@@ -117,6 +181,7 @@ function App() {
 
   const handlePixelDown = useCallback((i, _val, isRight) => {
     isDrawing.current = true; drawMode.current = !isRight;
+    pushHistory(currentChar, grid);
     if (tool === 'fill') {
       const filled = floodFill(grid, gridSize, i, drawMode.current);
       setGrid(filled);
@@ -124,12 +189,20 @@ function App() {
       return;
     }
     setGrid(prev => { const next = applyPixelTool(prev, i); setFontData(fd => ({ ...fd, [currentChar]: next })); return next; });
-  }, [tool, grid, gridSize, currentChar, applyPixelTool, handleSaveFont]);
+  }, [tool, grid, gridSize, currentChar, applyPixelTool, handleSaveFont, pushHistory]);
 
   const handlePixelEnter = useCallback((i) => {
     if (!isDrawing.current || tool === 'fill') return;
-    setGrid(prev => { const next = applyPixelTool(prev, i); setFontData(fd => ({ ...fd, [currentChar]: next })); return next; });
-  }, [tool, currentChar, applyPixelTool]);
+    setGrid(prev => {
+      const next = applyPixelTool(prev, i);
+      setFontData(fd => {
+        const nfd = { ...fd, [currentChar]: next };
+        scheduleSave(nfd); // debounced — no escribe en cada pixel
+        return nfd;
+      });
+      return next;
+    });
+  }, [tool, currentChar, applyPixelTool, scheduleSave]);
 
   const handleMouseUp = useCallback(() => {
     if (!isDrawing.current) return;
@@ -144,13 +217,19 @@ function App() {
   };
 
   const clearCanvas = () => {
-    if (!confirm('¿Limpiar esta letra?')) return;
-    const empty = Array(gridSize * gridSize).fill(false);
-    setGrid(empty);
-    setFontData(prev => { const fd = { ...prev, [currentChar]: empty }; handleSaveFont(fd); return fd; });
+    setConfirmDialog({
+      message: '¿Limpiar esta letra? Esta acción no se puede deshacer.',
+      onConfirm: () => {
+        const empty = Array(gridSize * gridSize).fill(false);
+        setGrid(empty);
+        setFontData(prev => { const fd = { ...prev, [currentChar]: empty }; handleSaveFont(fd); return fd; });
+        setConfirmDialog(null);
+      }
+    });
   };
 
   const invertCanvas = () => {
+    pushHistory(currentChar, grid);
     setGrid(prev => {
       const inv = prev.map(p => !p);
       setFontData(fd => { const nfd = { ...fd, [currentChar]: inv }; handleSaveFont(nfd); return nfd; });
@@ -159,6 +238,7 @@ function App() {
   };
 
   const doShift = (dir) => {
+    pushHistory(currentChar, grid);
     setGrid(prev => {
       const s = shiftGrid(prev, gridSize, dir);
       setFontData(fd => { const nfd = { ...fd, [currentChar]: s }; handleSaveFont(nfd); return nfd; });
@@ -167,10 +247,16 @@ function App() {
   };
 
   useEffect(() => {
-    const handler = (e) => { if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); handleSaveFont(fontData); } };
+    const handler = (e) => {
+      if (e.ctrlKey || e.metaKey) {
+        if (e.key === 's') { e.preventDefault(); handleSaveFont(fontData); return; }
+        if (e.key === 'z' && !e.shiftKey) { e.preventDefault(); handleUndo(); return; }
+        if (e.key === 'y' || (e.key === 'z' && e.shiftKey)) { e.preventDefault(); handleRedo(); return; }
+      }
+    };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [fontData, handleSaveFont]);
+  }, [fontData, handleSaveFont, handleUndo, handleRedo]);
 
   // ── Loading / error states ───────────────────
   if (status === 'loading') {
@@ -193,25 +279,34 @@ function App() {
     }, errorMsg);
   }
 
-  return React.createElement(EditorPage, {
-    user, isDark, toggleTheme,
-    gridSize, currentChar, fontData, grid, isSaving,
-    tool, setTool, previewText, setPreviewText,
-    onPixelDown:   handlePixelDown,
-    onPixelEnter:  handlePixelEnter,
-    onMouseUp:     handleMouseUp,
-    onSwitchChar:  switchChar,
-    onClearCanvas: clearCanvas,
-    onInvert:      invertCanvas,
-    onShift:       doShift,
-    onSave:        () => handleSaveFont(fontData),
-    onBack:        () => window.location.replace('feed.html'),
-    onPublish:     handlePublish,
-    isPublishing,
-    publishedOk,
-    onResetPublish: () => setPublishedOk(false),
-    projectName:   proyectoNombre
-  });
+  return React.createElement(React.Fragment, null,
+    React.createElement(EditorPage, {
+      user, isDark, toggleTheme,
+      gridSize, currentChar, fontData, grid, isSaving,
+      tool, setTool, previewText, setPreviewText,
+      onPixelDown:   handlePixelDown,
+      onPixelEnter:  handlePixelEnter,
+      onMouseUp:     handleMouseUp,
+      onSwitchChar:  switchChar,
+      onClearCanvas: clearCanvas,
+      onInvert:      invertCanvas,
+      onShift:       doShift,
+      onUndo:        handleUndo,
+      onRedo:        handleRedo,
+      onSave:        () => handleSaveFont(fontData),
+      onBack:        () => window.location.replace('feed.html'),
+      onPublish:     handlePublish,
+      isPublishing,
+      publishedOk,
+      onResetPublish: () => setPublishedOk(false),
+      projectName:   proyectoNombre
+    }),
+    confirmDialog && React.createElement(ConfirmDialog, {
+      message:   confirmDialog.message,
+      onConfirm: confirmDialog.onConfirm,
+      onCancel:  () => setConfirmDialog(null)
+    })
+  );
 }
 
 const root = ReactDOM.createRoot(document.getElementById('root'));

@@ -13,7 +13,7 @@ export function initNavbar({ auth, db, onAuthStateChanged, doc, getDoc }) {
     const lbl = document.getElementById('dd-theme-label');
     if (lbl) lbl.textContent = t === 'dark' ? 'Tema claro' : 'Tema oscuro';
     const icon = document.getElementById('dd-theme-icon');
-    if (icon) icon.src = t === 'dark' ? 'src/icons/theme-light.svg' : 'src/icons/theme.svg';
+    if (icon) icon.src = t === 'dark' ? 'src/icons/sun.svg' : 'src/icons/moon.svg';
   }
   applyTheme(getTheme());
 

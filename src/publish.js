@@ -31,8 +31,17 @@ export async function publishFont(user, proyecto, previewText = 'HELLO') {
     }
   } catch {}
 
-  const postId = proyecto.id; // 1 post por proyecto
+  const postId  = proyecto.id; // 1 post por proyecto
   const postRef = doc(db, 'posts', postId);
+
+  // Verificar si ya existe el post para conservar publishedAt original
+  let existingPublishedAt = null;
+  try {
+    const existing = await getDoc(postRef);
+    if (existing.exists()) {
+      existingPublishedAt = existing.data().publishedAt || null;
+    }
+  } catch {}
 
   const data = {
     uid:          user.uid,
@@ -45,9 +54,12 @@ export async function publishFont(user, proyecto, previewText = 'HELLO') {
     font:         proyecto.font || {},
     proyectoId:   proyecto.id,
     previewText,
-    publishedAt:  serverTimestamp(),
+    // Solo actualizar publishedAt si es la primera vez; si ya existe, conservar el original
+    ...(existingPublishedAt ? {} : { publishedAt: serverTimestamp() }),
+    updatedAt:    serverTimestamp(),
   };
 
-  await setDoc(postRef, data, { merge: false });
+  // merge:true preserva campos como likes o comentarios que no están en data
+  await setDoc(postRef, data, { merge: true });
   return postId;
 }

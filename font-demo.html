@@ -3,6 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta property="og:title" content="CodeShelf — Demo de Fuente">
+  <meta property="og:description" content="Previsualiza fuentes pixel art en CodeShelf">
+  <meta property="og:image" content="https://tu-dominio.com/og-preview.png">
+  <meta property="og:type" content="website">
+  <meta name="twitter:card" content="summary_large_image">
   <title>Codeshelf — Demo de Fuente</title>
   <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Press+Start+2P&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="src/shared.css">
@@ -346,6 +351,7 @@
 
     onAuthStateChanged(auth, async (user) => {
       hide('screen-loading');
+      if (!user) { window.location.replace('index.html'); return; }
       if (user) {
         try {
           const perfil = await getDoc(doc(db, 'usuarios', user.uid, 'config', 'perfil'));
