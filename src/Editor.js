@@ -8,7 +8,7 @@ import { Btn, Icon, Overlay, Modal, Label } from './ui.js';
 import { buildAndDownload } from './canvas.js';
 
 // ── Pixel preview helper ──────────────────────
-const PixelPreview = ({ text, fontData, gridSize, pixelSize = 3, color = ACCENT }) => {
+const PixelPreview = ({ text, fontData, gridSize, pixelSize = 3, color = ACCENT, showSpaceMarker = false }) => {
   const chars = text.split('');
   const sz = Math.min(gridSize, 32);
   return React.createElement('div', {
@@ -16,9 +16,17 @@ const PixelPreview = ({ text, fontData, gridSize, pixelSize = 3, color = ACCENT 
   },
     chars.map((ch, ci) => {
       const glyph = fontData[ch];
+      const isSpace = ch === ' ';
       return React.createElement('div', {
         key: ci,
-        style: { display: 'grid', gridTemplateColumns: `repeat(${sz},${pixelSize}px)` }
+        style: {
+          display: 'grid',
+          gridTemplateColumns: `repeat(${sz},${pixelSize}px)`,
+          position: 'relative',
+          border: (isSpace && showSpaceMarker) ? '1px dashed var(--border)' : 'none',
+          borderRadius: '4px',
+          padding: (isSpace && showSpaceMarker) ? '2px' : 0
+        }
       },
         Array(sz * sz).fill(0).map((_, pi) =>
           React.createElement('div', {
@@ -28,14 +36,21 @@ const PixelPreview = ({ text, fontData, gridSize, pixelSize = 3, color = ACCENT 
               background: glyph?.[pi] ? color : 'transparent'
             }
           })
-        )
+        ),
+        (isSpace && showSpaceMarker) && React.createElement('div', {
+          style: {
+            position: 'absolute', top: '2px', bottom: '2px', left: '50%',
+            width: '1px', transform: 'translateX(-50%)',
+            background: 'var(--border-accent)', opacity: .65, pointerEvents: 'none'
+          }
+        })
       );
     })
   );
 };
 
 // ── Export modal ──────────────────────────────
-const ExportModal = ({ projectName, fontData, gridSize, previewText: externalPreviewText, onClose, onExport }) => {
+const ExportModal = ({ projectName, fontData, gridSize, previewText: externalPreviewText, onClose, onExport, showSpaceMarker }) => {
   const [filename,      setFilename]      = useState(projectName || 'mi-fuente');
   const [fontName,      setFontName]      = useState(projectName || 'mi-fuente');
   const [author,        setAuthor]        = useState('');
@@ -92,7 +107,7 @@ const ExportModal = ({ projectName, fontData, gridSize, previewText: externalPre
           style: { fontFamily: FONT_MONO, fontSize: '8px', color: 'var(--muted)', letterSpacing: '2px', marginBottom: '10px' }
         }, 'PREVIEW'),
         React.createElement(PixelPreview, {
-          text: PREVIEW_TEXT, fontData, gridSize, pixelSize: 4, color: ACCENT
+          text: PREVIEW_TEXT, fontData, gridSize, pixelSize: 4, color: ACCENT, showSpaceMarker
         })
       ),
 
@@ -250,7 +265,7 @@ const ExportModal = ({ projectName, fontData, gridSize, previewText: externalPre
 };
 
 // ── Publish modal ─────────────────────────────
-const PublishModal = ({ projectName, fontData, gridSize, onClose, onPublish, isPublishing, published }) => {
+const PublishModal = ({ projectName, fontData, gridSize, onClose, onPublish, isPublishing, published, showSpaceMarker }) => {
   const [previewText, setPreviewText] = useState('HELLO WORLD');
 
   if (published) {
@@ -317,7 +332,7 @@ const PublishModal = ({ projectName, fontData, gridSize, onClose, onPublish, isP
             }
           })
         ),
-        React.createElement(PixelPreview, { text: previewText, fontData, gridSize, pixelSize: 4, color: ACCENT })
+        React.createElement(PixelPreview, { text: previewText, fontData, gridSize, pixelSize: 4, color: ACCENT, showSpaceMarker })
       ),
 
       React.createElement('div', { style: { display: 'flex', gap: '10px' } },
@@ -410,6 +425,7 @@ export function EditorPage({
   const [openUserMenu,  setOpenUserMenu]  = useState(false);
   const [avatarColor,   setAvatarColor]   = useState(ACCENT);
   const [showGuides,    setShowGuides]    = useState(false);
+  const [showSpaceMarker, setShowSpaceMarker] = useState(() => localStorage.getItem('cs-show-space-marker') !== '0');
 
   const avatarInit = (user?.displayName || user?.email || '?')[0].toUpperCase();
 
@@ -429,6 +445,10 @@ export function EditorPage({
     if (openFileMenu || openUserMenu) window.addEventListener('click', close);
     return () => window.removeEventListener('click', close);
   }, [openFileMenu, openUserMenu]);
+
+  useEffect(() => {
+    localStorage.setItem('cs-show-space-marker', showSpaceMarker ? '1' : '0');
+  }, [showSpaceMarker]);
 
   const modeTools = [
     { id: 'pencil',   iconName: 'pencil',   label: 'LIBRE'    },
@@ -547,6 +567,22 @@ export function EditorPage({
         },
           React.createElement(ToolIcon, { name: 'guides', size: 14, active: showGuides }),
           'GUÍAS'
+        ),
+
+        React.createElement('button', {
+          onClick: () => setShowSpaceMarker(v => !v),
+          title: showSpaceMarker ? 'Ocultar marcador de espacio' : 'Mostrar marcador de espacio',
+          style: {
+            height: '32px', padding: '0 10px', borderRadius: R_BTN,
+            background: showSpaceMarker ? ACCENT : 'var(--surface2)',
+            border: showSpaceMarker ? 'none' : '1px solid var(--border)',
+            cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px',
+            fontFamily: FONT_MONO, fontSize: '8px', letterSpacing: '1px',
+            color: showSpaceMarker ? '#fff' : 'var(--muted)', transition: 'all .15s'
+          }
+        },
+          React.createElement('span', { style: { fontSize: '11px', lineHeight: 1 } }, '␠'),
+          'ESPACIO'
         ),
 
         React.createElement('button', {
@@ -725,6 +761,19 @@ export function EditorPage({
               })
             )
           ),
+          (showSpaceMarker && currentChar === ' ') && React.createElement('div', {
+            style: {
+              position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 4
+            }
+          },
+            React.createElement('div', {
+              style: {
+                position: 'absolute', top: '2px', bottom: '2px', left: '50%',
+                width: '1px', transform: 'translateX(-50%)',
+                background: 'var(--border-accent)', opacity: .8
+              }
+            })
+          ),
           showGuides && React.createElement(GuideOverlay, { gridSize })
         ),
 
@@ -759,16 +808,30 @@ export function EditorPage({
             previewText.split('').map((ch, ci) => {
               const glyph = fontData[ch];
               const sz = Math.min(gridSize, 16), px = 3;
+              const isSpace = ch === ' ';
               return React.createElement('div', {
                 key: ci,
-                style: { display: 'grid', gridTemplateColumns: `repeat(${sz},${px}px)`, marginRight: '2px' }
+                style: {
+                  display: 'grid', gridTemplateColumns: `repeat(${sz},${px}px)`, marginRight: '2px',
+                  position: 'relative',
+                  border: (isSpace && showSpaceMarker) ? '1px dashed var(--border)' : 'none',
+                  borderRadius: '4px',
+                  padding: (isSpace && showSpaceMarker) ? '2px' : 0
+                }
               },
                 Array(sz * sz).fill(0).map((_, pi) =>
                   React.createElement('div', {
                     key: pi,
                     style: { width: `${px}px`, height: `${px}px`, background: glyph?.[pi] ? ACCENT : 'transparent' }
                   })
-                )
+                ),
+                (isSpace && showSpaceMarker) && React.createElement('div', {
+                  style: {
+                    position: 'absolute', top: '2px', bottom: '2px', left: '50%',
+                    width: '1px', transform: 'translateX(-50%)',
+                    background: 'var(--border-accent)', opacity: .65, pointerEvents: 'none'
+                  }
+                })
               );
             })
           )
@@ -838,6 +901,14 @@ export function EditorPage({
               }
             },
               t === ' ' ? '·' : t,
+              (showSpaceMarker && t === ' ') && React.createElement('div', {
+                style: {
+                  position: 'absolute', top: '8px', bottom: '8px', left: '50%',
+                  width: '1px', transform: 'translateX(-50%)',
+                  background: isActive ? 'rgba(255,255,255,0.9)' : 'var(--border-accent)',
+                  opacity: .8
+                }
+              }),
               configured && !isActive && React.createElement('div', {
                 style: {
                   position: 'absolute', top: '4px', right: '4px',
@@ -854,6 +925,7 @@ export function EditorPage({
     showExport && React.createElement(ExportModal, {
       projectName, fontData, gridSize,
       previewText,
+      showSpaceMarker,
       onClose: () => setShowExport(false),
       onExport: (filename, format, meta) => {
         buildAndDownload(fontData, gridSize, filename, format, meta);
@@ -863,6 +935,7 @@ export function EditorPage({
 
     showPublish && React.createElement(PublishModal, {
       projectName, fontData, gridSize,
+      showSpaceMarker,
       isPublishing, published: publishedOk,
       onClose: () => { setShowPublish(false); onResetPublish && onResetPublish(); },
       onPublish: (prevText) => onPublish && onPublish(prevText)
