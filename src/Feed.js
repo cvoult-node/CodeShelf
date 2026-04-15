@@ -179,7 +179,20 @@ export function initFeedEvents(onCreateProject) {
 
   btnConf.onclick = async () => {
     const nombre = inputName.value.trim();
-    if (!nombre) { inputName.focus(); inputName.style.borderColor = 'var(--accent)'; setTimeout(() => inputName.style.borderColor = '', 1000); return; }
+    if (!nombre) {
+      inputName.focus();
+      inputName.style.borderColor = 'var(--accent)';
+      setTimeout(() => inputName.style.borderColor = '', 1000);
+      return;
+    }
+    const validName = /^[\p{L}\p{N}-]+$/u.test(nombre);
+    if (!validName) {
+      inputName.focus();
+      inputName.style.borderColor = 'var(--accent)';
+      setTimeout(() => inputName.style.borderColor = '', 1000);
+      alert('Usa solo letras, números y guiones.');
+      return;
+    }
     btnConf.disabled = true; btnConf.textContent = '...';
     try { await btnConf._onCreate(nombre, selectedSize); }
     catch (err) { console.error(err); alert('No se pudo crear el proyecto.'); }
