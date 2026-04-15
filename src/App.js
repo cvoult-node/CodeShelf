@@ -55,7 +55,7 @@ function App() {
   const [grid,          setGrid]          = useState([]);
   const [isSaving,      setIsSaving]      = useState(false);
   const [tool,          setTool]          = useState('pencil');
-  const [previewText,   setPreviewText]   = useState('CodeShelf');
+  const [previewText,   setPreviewText]   = useState('Lorem ipsum dolor sit amet, consectetur adipiscing elit.');
   const [isPublishing,  setIsPublishing]  = useState(false);
   const [publishedOk,   setPublishedOk]   = useState(false);
   // Para reemplazar confirm() nativo con modal personalizado

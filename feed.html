@@ -151,42 +151,6 @@
     .btn-confirm:hover { background: var(--accent-h); transform: translateY(-1px); }
     .btn-confirm:disabled { opacity: .45; cursor: not-allowed; transform: none; }
 
-    /* ── Auth fallback ── */
-    .auth-screen { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 16px; }
-    .auth-box {
-      width: 100%; max-width: 360px; background: var(--surface); border: 1px solid var(--border);
-      border-radius: var(--r-card); padding: 44px 36px 40px;
-      box-shadow: 0 20px 60px rgba(0,0,0,0.12);
-    }
-    .auth-logo { text-align: center; margin-bottom: 36px; }
-    .auth-logo-text { font-family: var(--pixel); font-size: 16px; color: var(--accent); line-height: 2; letter-spacing: 4px; }
-    .auth-tagline { font-size: 7px; letter-spacing: 5px; color: var(--muted); margin-top: 10px; }
-    .auth-form { display: flex; flex-direction: column; gap: 10px; }
-    .auth-input {
-      background: var(--surface2); border: 1px solid var(--border); border-radius: var(--r-btn);
-      padding: 13px 15px; color: var(--text); font-family: var(--mono); font-size: 13px;
-      outline: none; transition: border-color .15s; width: 100%;
-    }
-    .auth-input:focus { border-color: var(--accent); }
-    .auth-input::placeholder { color: var(--muted); }
-    .btn-auth {
-      background: var(--accent); color: #fff; border: none; border-radius: var(--r-btn);
-      padding: 14px; font-family: var(--mono); font-weight: 700; font-size: 10px;
-      letter-spacing: 2.5px; cursor: pointer; margin-top: 6px; transition: background .15s;
-    }
-    .btn-auth:hover { background: var(--accent-h); }
-    .auth-divider { display: flex; align-items: center; gap: 12px; margin: 22px 0; }
-    .auth-divider-line { flex: 1; height: 1px; background: var(--border); }
-    .auth-divider-text { font-size: 9px; letter-spacing: 2px; color: var(--muted); }
-    .btn-google {
-      width: 100%; padding: 13px; background: var(--surface2); border: 1px solid var(--border2);
-      border-radius: var(--r-btn); color: var(--text); font-family: var(--mono);
-      font-size: 11px; font-weight: 700; cursor: pointer;
-      transition: background .15s; display: flex; align-items: center; justify-content: center; gap: 10px;
-    }
-    .btn-google img { width: 16px; height: 16px; filter: var(--icon-filter); }
-    .btn-google:hover { background: var(--surface3); }
-
     /* ── Grid size selector ── */
     .modal-section-label {
       font-size: 8px; letter-spacing: 2px; color: var(--muted);
@@ -206,6 +170,19 @@
     .grid-size-btn.active span { color: rgba(255,255,255,0.7); }
     .grid-size-btn:hover:not(.active) { border-color: var(--border2); color: var(--text); background: var(--surface3); }
 
+
+    /* ── Comunidad (descargas) ── */
+    .community-section { margin-top: 30px; }
+    .community-head { display:flex; align-items:center; justify-content:space-between; margin-bottom: 12px; }
+    .community-title { font-family: var(--pixel); font-size: 9px; color: var(--text); letter-spacing: 2px; }
+    .community-sub { font-size: 9px; color: var(--muted); letter-spacing: 1px; }
+    .community-list { display: grid; gap: 10px; }
+    .community-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-btn); padding: 12px; display:flex; justify-content:space-between; align-items:center; gap: 10px; }
+    .community-name { font-size: 11px; color: var(--text); font-weight: 700; }
+    .community-meta { font-size: 9px; color: var(--muted); margin-top: 3px; }
+    .btn-download { background: var(--surface2); color: var(--text); border: 1px solid var(--border); border-radius: var(--r-btn); padding: 8px 10px; font-family: var(--mono); font-size: 9px; letter-spacing: 1px; cursor:pointer; }
+    .btn-download:hover { border-color: var(--border-accent); color: var(--accent); }
+
     /* ── Card rename ── */
     .card-title-row { display: flex; align-items: center; gap: 6px; }
     .btn-edit-name {
@@ -221,29 +198,6 @@
   <div id="screen-loading" class="loading-screen">
     <span class="loading-text">CARGANDO...</span>
     <div class="loading-bar"></div>
-  </div>
-
-  <div id="screen-auth" class="auth-screen hidden">
-    <div class="auth-box">
-      <div class="auth-logo">
-        <div class="auth-logo-text">CODE<br>SHELF</div>
-        <p class="auth-tagline">PIXEL FONT STUDIO</p>
-      </div>
-      <form class="auth-form" id="auth-form">
-        <input class="auth-input" type="email"    id="auth-email"    placeholder="Email" autocomplete="email" required>
-        <input class="auth-input" type="password" id="auth-password" placeholder="Contraseña" autocomplete="current-password" required>
-        <button type="submit" class="btn-auth">ENTRAR / REGISTRAR</button>
-      </form>
-      <div class="auth-divider">
-        <div class="auth-divider-line"></div>
-        <span class="auth-divider-text">O</span>
-        <div class="auth-divider-line"></div>
-      </div>
-      <button class="btn-google" id="btn-google">
-        <img src="src/icons/user.svg" alt="">Continuar con Google
-      </button>
-      <p id="auth-error" style="color:var(--accent);font-size:9px;margin-top:14px;text-align:center;display:none;"></p>
-    </div>
   </div>
 
   <div id="screen-app" class="hidden">
@@ -285,9 +239,6 @@
                 <img class="dd-icon" src="src/icons/theme.svg" id="dd-theme-icon" alt="">
                 <span id="dd-theme-label">Tema oscuro</span>
               </button>
-              <button class="dd-item danger" id="dd-logout">
-                <img class="dd-icon" src="src/icons/logout.svg" alt="">Cerrar sesión
-              </button>
             </div>
           </div>
         </div>
@@ -319,6 +270,14 @@
       </button>
 
       <div id="projects-list"></div>
+
+      <section class="community-section">
+        <div class="community-head">
+          <span class="community-title">DESCARGAR FUENTES DE LA COMUNIDAD</span>
+          <span class="community-sub" id="community-count"></span>
+        </div>
+        <div class="community-list" id="community-list"></div>
+      </section>
     </main>
   </div>
 
@@ -346,10 +305,9 @@
     <script src="src/env.js"></script>
   <script type="module">
     import {
-      auth, provider, db,
-      signInWithPopup, signOut, onAuthStateChanged,
-      signInWithEmailAndPassword, createUserWithEmailAndPassword,
-      doc, setDoc, getDoc, getDocs, collection, query, orderBy, deleteDoc
+      auth, db,
+      signOut, onAuthStateChanged,
+      doc, setDoc, getDoc, getDocs, collection, query, orderBy, where, limit, deleteDoc
     } from './src/firebase.js';
     import { renderFeed, initFeedEvents } from './src/Feed.js';
 
@@ -386,7 +344,8 @@
       document.getElementById('modal-overlay').classList.remove('hidden');
       document.getElementById('new-font-name').value = ''; document.getElementById('new-font-name').focus();
     };
-    document.getElementById('dd-logout').onclick = () => signOut(auth).then(() => window.location.reload());
+    const logoutBtn = document.getElementById('dd-logout');
+    if (logoutBtn) logoutBtn.onclick = () => signOut(auth).then(() => window.location.replace('index.html'));
 
     // ── View toggle ────────────────────────────────────────────────────────
     let currentView = localStorage.getItem('cs-feed-view') || 'list';
@@ -433,10 +392,58 @@
       if (el) el.textContent = `${n} PROYECTO${n !== 1 ? 'S' : ''}`;
     }
 
+    async function cargarFuentesComunidad(currentUid) {
+      const q = query(collection(db, 'posts'), where('uid', '!=', currentUid), orderBy('uid'), orderBy('publishedAt', 'desc'), limit(12));
+      const snp = await getDocs(q);
+      return snp.docs.map(d => ({ id: d.id, ...d.data() }));
+    }
+
+    function descargarFuenteComunidad(post) {
+      const safeName = (post.fontNombre || 'fuente-comunidad').replace(/[^a-z0-9-_]+/gi, '-').toLowerCase();
+      const payload = {
+        nombre: post.fontNombre || 'Sin nombre',
+        autor: post.autorNombre || post.autorEmail || 'Anónimo',
+        gridSize: post.gridSize || 8,
+        font: post.font || {}
+      };
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${safeName}.codeshelf-font.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function renderComunidad(posts) {
+      const list = document.getElementById('community-list');
+      const count = document.getElementById('community-count');
+      if (count) count.textContent = `${posts.length} DISPONIBLE${posts.length === 1 ? '' : 'S'}`;
+      if (!list) return;
+      list.innerHTML = '';
+      if (!posts.length) {
+        list.innerHTML = '<div class="community-card"><div class="community-meta">No hay fuentes publicadas por otros usuarios todavía.</div></div>';
+        return;
+      }
+      posts.forEach(post => {
+        const card = document.createElement('div');
+        card.className = 'community-card';
+        card.innerHTML = `
+          <div>
+            <div class="community-name">${post.fontNombre || 'Sin nombre'}</div>
+            <div class="community-meta">por ${post.autorNombre || post.autorEmail || 'Anónimo'} · ${post.gridSize || 8}px</div>
+          </div>
+          <button class="btn-download">DESCARGAR</button>
+        `;
+        card.querySelector('.btn-download').onclick = () => descargarFuenteComunidad(post);
+        list.appendChild(card);
+      });
+    }
+
     // ── Auth state ─────────────────────────────────────────────────────────
     onAuthStateChanged(auth, async (user) => {
       hide('screen-loading');
-      if (!user) { show('screen-auth'); return; }
+      if (!user) { window.location.replace('index.html'); return; }
 
       // Avatar hydration
       let initial = (user.email || '?')[0].toUpperCase();
@@ -469,20 +476,11 @@
       renderFeed(proyectos, onOpen, onDelete, onRename);
       updateCount(proyectos.length);
       initFeedEvents(onCreate);
+
+      const fuentesComunidad = await cargarFuentesComunidad(user.uid);
+      renderComunidad(fuentesComunidad);
     });
 
-    // ── Auth form ──────────────────────────────────────────────────────────
-    document.getElementById('auth-form').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const email = document.getElementById('auth-email').value.trim();
-      const pass  = document.getElementById('auth-password').value;
-      const errEl = document.getElementById('auth-error');
-      errEl.style.display = 'none';
-      try { await signInWithEmailAndPassword(auth, email, pass); }
-      catch { try { await createUserWithEmailAndPassword(auth, email, pass); } catch (err) { errEl.textContent = err.message; errEl.style.display = 'block'; } }
-    });
-    document.getElementById('btn-google').onclick = () =>
-      signInWithPopup(auth, provider).catch(err => { const e = document.getElementById('auth-error'); e.textContent = err.message; e.style.display = 'block'; });
   </script>
 </body>
 </html>

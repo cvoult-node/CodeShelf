@@ -82,7 +82,7 @@ const PixelPreview = ({
 };
 
 // ── Export modal ──────────────────────────────
-const ExportModal = ({ projectName, fontData, gridSize, previewText: externalPreviewText, onClose, onExport, showSpaceMarker }) => {
+const ExportModal = ({ projectName, fontData, gridSize, previewText: externalPreviewText, onClose, onExport }) => {
   const [filename,      setFilename]      = useState(projectName || 'mi-fuente');
   const [fontName,      setFontName]      = useState(projectName || 'mi-fuente');
   const [author,        setAuthor]        = useState('');
@@ -94,7 +94,7 @@ const ExportModal = ({ projectName, fontData, gridSize, previewText: externalPre
   const [ascender,      setAscender]      = useState(800);
   const [descender,     setDescender]     = useState(-200);
 
-  const PREVIEW_TEXT = externalPreviewText || 'ABCDE abcde 0123';
+  const PREVIEW_TEXT = externalPreviewText || 'Lorem ipsum dolor sit amet, consectetur adipiscing elit.';
 
   const inputStyle = {
     background: 'var(--surface2)', border: '1px solid var(--border)',
@@ -117,8 +117,8 @@ const ExportModal = ({ projectName, fontData, gridSize, previewText: externalPre
     React.createElement('div', {
       style: {
         background: 'var(--surface)', border: '1px solid var(--border2)',
-        borderRadius: R_CARD, padding: '28px', width: '100%', maxWidth: '520px',
-        maxHeight: '88vh', overflowY: 'auto',
+        borderRadius: R_CARD, padding: '24px', width: '520px', minWidth: '520px', maxWidth: '520px',
+        height: '760px', minHeight: '760px', maxHeight: '760px', overflowY: 'auto',
         boxShadow: '0 32px 80px rgba(0,0,0,0.25)',
         display: 'flex', flexDirection: 'column', gap: '20px'
       }
@@ -131,18 +131,18 @@ const ExportModal = ({ projectName, fontData, gridSize, previewText: externalPre
       // Preview
 React.createElement('div', {
   style: {
-    background: 'var(--canvas-bg)',
-    border: '1px solid var(--border)',
+    background: 'var(--surface2)',
+    border: '1px solid var(--border2)',
     borderRadius: R_BTN,
-    padding: '16px',
-    minHeight: '72px'
+    padding: '14px',
+    minHeight: '96px'
   }
 },
   React.createElement('div', {
     style: {
       fontFamily: FONT_MONO,
-      fontSize: '8px',
-      color: 'var(--muted)',
+      fontSize: '9px',
+      color: 'var(--muted2)',
       letterSpacing: '2px',
       marginBottom: '10px'
     }
@@ -154,7 +154,7 @@ React.createElement('div', {
     gridSize,
     pixelSize: 4,
     color: ACCENT,
-    showSpaceMarker,
+    showSpaceMarker: false,
     letterSpacing,
     wordSpacing
   })
@@ -416,20 +416,20 @@ const PreferencesModal = ({ onClose, showGuides, setShowGuides, showSpaceMarker,
       }, 'PREFERENCIAS DEL EDITOR'),
       React.createElement('p', {
         style: { margin: 0, fontFamily: FONT_MONO, fontSize: '10px', color: 'var(--muted)', lineHeight: '1.6' }
-      }, 'Configura cómo se muestran las guías y los marcadores visuales mientras dibujas.'),
+      }, 'Ajusta la visualización del editor para dibujar con más precisión y menos ruido visual.'),
       React.createElement('div', { style: { display: 'grid', gap: '10px' } },
         [
           {
             id: 'guides',
-            title: 'Mostrar guías del canvas',
-            desc: 'Incluye subcuadrícula y línea base para alinear los glifos.',
+            title: 'Guías de alineación',
+            desc: 'Muestra eje central, baseline y divisiones para ubicar los glifos correctamente.',
             val: showGuides,
             setVal: setShowGuides
           },
           {
             id: 'space',
-            title: 'Mostrar marcador de espacio',
-            desc: 'Dibuja una línea de referencia para que el glifo espacio no sea invisible.',
+            title: 'Marcador del carácter espacio',
+            desc: 'Activa una referencia visual para editar el espacio sin confundirlo con celdas vacías.',
             val: showSpaceMarker,
             setVal: setShowSpaceMarker
           }
@@ -439,8 +439,8 @@ const PreferencesModal = ({ onClose, showGuides, setShowGuides, showSpaceMarker,
             onClick: () => item.setVal(v => !v),
             style: {
               width: '100%', textAlign: 'left',
-              background: item.val ? 'rgba(191,69,69,0.1)' : 'var(--surface2)',
-              border: item.val ? '1px solid rgba(191,69,69,0.35)' : '1px solid var(--border)',
+              background: item.val ? 'var(--accent3)' : 'var(--surface2)',
+              border: item.val ? '1px solid var(--border-accent)' : '1px solid var(--border)',
               borderRadius: R_BTN, padding: '11px 12px', cursor: 'pointer'
             }
           },
@@ -464,40 +464,48 @@ const PreferencesModal = ({ onClose, showGuides, setShowGuides, showSpaceMarker,
 
 // ── Guide overlay SVG ─────────────────────────
 const GuideOverlay = ({ gridSize }) => {
-  const step = gridSize <= 8 ? 4 : gridSize <= 16 ? 4 : 8;
+  const step = gridSize <= 16 ? 4 : 8;
   const lines = [];
   for (let i = step; i < gridSize; i += step) {
     const pct = (i / gridSize * 100).toFixed(4);
     lines.push(
       React.createElement('line', {
         key: `v${i}`, x1: `${pct}%`, y1: '0', x2: `${pct}%`, y2: '100%',
-        stroke: 'rgba(191,69,69,0.35)', strokeWidth: '1'
+        stroke: 'rgba(191,69,69,0.22)', strokeWidth: '1'
       }),
       React.createElement('line', {
         key: `h${i}`, x1: '0', y1: `${pct}%`, x2: '100%', y2: `${pct}%`,
-        stroke: 'rgba(191,69,69,0.35)', strokeWidth: '1'
+        stroke: 'rgba(191,69,69,0.22)', strokeWidth: '1'
       })
     );
   }
-  // Línea central (mitad)
+
+  const yCap = ((Math.max(1, Math.floor(gridSize * 0.2)) / gridSize) * 100).toFixed(4);
+  const yXHeight = ((Math.max(1, Math.floor(gridSize * 0.5)) / gridSize) * 100).toFixed(4);
+  const yBaseline = (((gridSize - 1) / gridSize) * 100).toFixed(4);
   const mid = ((gridSize / 2) / gridSize * 100).toFixed(4);
+
+  const namedGuide = (key, y, label, stroke, width = '1.4') => ([
+    React.createElement('line', {
+      key: `${key}-line`, x1: '0', y1: `${y}%`, x2: '100%', y2: `${y}%`,
+      stroke, strokeWidth: width
+    }),
+    React.createElement('text', {
+      key: `${key}-label`, x: '98%', y: `${Math.max(3, Number(y) - 1.2)}%`,
+      fill: stroke, fontSize: '7', textAnchor: 'end'
+    }, label)
+  ]);
+
   lines.push(
     React.createElement('line', {
       key: 'vc', x1: `${mid}%`, y1: '0', x2: `${mid}%`, y2: '100%',
-      stroke: 'rgba(191,69,69,0.55)', strokeWidth: '1.5'
+      stroke: 'rgba(191,69,69,0.45)', strokeWidth: '1.4'
     }),
-    React.createElement('line', {
-      key: 'hc', x1: '0', y1: `${mid}%`, x2: '100%', y2: `${mid}%`,
-      stroke: 'rgba(191,69,69,0.55)', strokeWidth: '1.5'
-    })
+    ...namedGuide('cap', yCap, 'CAP', 'rgba(191,69,69,0.58)'),
+    ...namedGuide('x', yXHeight, 'X-HEIGHT', 'rgba(191,69,69,0.55)'),
+    ...namedGuide('base', yBaseline, 'BASE', 'rgba(191,69,69,0.75)', '1.6')
   );
-  const baseline = (((gridSize - 1) / gridSize) * 100).toFixed(4);
-  lines.push(
-    React.createElement('line', {
-      key: 'baseline', x1: '0', y1: `${baseline}%`, x2: '100%', y2: `${baseline}%`,
-      stroke: 'rgba(191,69,69,0.95)', strokeWidth: '1.8'
-    })
-  );
+
   return React.createElement('svg', {
     style: {
       position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
@@ -622,27 +630,27 @@ export function EditorPage({
               position: 'absolute', top: 'calc(100% + 8px)', left: 0,
               background: 'var(--surface)', border: '1px solid var(--border2)',
               borderRadius: '10px', minWidth: '210px', zIndex: 300,
-              boxShadow: '0 12px 40px rgba(0,0,0,0.15)',
-              overflow: 'hidden', padding: '5px 0'
+              boxShadow: 'var(--shadow-card)',
+              overflow: 'hidden', padding: '6px'
             }
           },
             [
-              { icon: 'fonts',   label: 'Mis proyectos',    fn: onBack },
-              { icon: 'save',    label: `Guardar  (Ctrl+S)`, fn: onSave },
-              { icon: 'theme',   label: 'Preferencias',      fn: () => { setShowPrefs(true); setOpenFileMenu(false); } },
-              { icon: 'export',  label: 'Exportar fuente',   fn: () => { setShowExport(true); setOpenFileMenu(false); } },
-              { icon: 'publish', label: 'Publicar en galería', fn: () => { setShowPublish(true); setOpenFileMenu(false); } },
+              { icon: 'fonts',   label: 'Mis proyectos',        fn: onBack },
+              { icon: 'save',    label: 'Guardar proyecto (Ctrl+S)', fn: onSave },
+              { icon: 'theme',   label: 'Preferencias del editor',   fn: () => { setShowPrefs(true); setOpenFileMenu(false); } },
+              { icon: 'export',  label: 'Exportar fuente',      fn: () => { setShowExport(true); setOpenFileMenu(false); } },
+              { icon: 'publish', label: 'Publicar en galería',  fn: () => { setShowPublish(true); setOpenFileMenu(false); } },
             ].map(({ icon, label, fn }) =>
               React.createElement('button', {
                 key: label, onClick: () => { fn(); setOpenFileMenu(false); },
                 style: {
                   display: 'flex', alignItems: 'center', gap: '10px',
-                  width: '100%', padding: '9px 16px', background: 'none', border: 'none',
+                  width: '100%', padding: '10px 12px', background: 'none', border: '1px solid transparent', borderRadius: '8px',
                   cursor: 'pointer', fontFamily: FONT_MONO, fontSize: '11px',
                   color: 'var(--muted)', textAlign: 'left', transition: 'background .12s, color .12s'
                 },
-                onMouseEnter: e => { e.currentTarget.style.background = 'rgba(130,100,200,0.07)'; e.currentTarget.style.color = 'var(--text)'; },
-                onMouseLeave: e => { e.currentTarget.style.background = 'none'; e.currentTarget.style.color = 'var(--muted)'; }
+                onMouseEnter: e => { e.currentTarget.style.background = 'var(--surface2)'; e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text)'; },
+                onMouseLeave: e => { e.currentTarget.style.background = 'none'; e.currentTarget.style.borderColor = 'transparent'; e.currentTarget.style.color = 'var(--muted)'; }
               },
                 React.createElement(ToolIcon, { name: icon, size: 14, style: { opacity: .5, filter: 'var(--icon-filter)' } }),
                 label
@@ -729,8 +737,8 @@ export function EditorPage({
                   fontFamily: FONT_MONO, fontSize: '11px', color: 'var(--muted)', textAlign: 'left',
                   transition: 'background .12s, color .12s'
                 },
-                onMouseEnter: e => { e.currentTarget.style.background = 'rgba(130,100,200,0.07)'; e.currentTarget.style.color = 'var(--text)'; },
-                onMouseLeave: e => { e.currentTarget.style.background = 'none'; e.currentTarget.style.color = 'var(--muted)'; }
+                onMouseEnter: e => { e.currentTarget.style.background = 'var(--surface2)'; e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text)'; },
+                onMouseLeave: e => { e.currentTarget.style.background = 'none'; e.currentTarget.style.borderColor = 'transparent'; e.currentTarget.style.color = 'var(--muted)'; }
               },
                 React.createElement(ToolIcon, { name: icon, size: 14, style: { opacity: .5, filter: 'var(--icon-filter)' } }),
                 label
@@ -738,7 +746,7 @@ export function EditorPage({
             ),
             React.createElement('div', { style: { borderTop: '1px solid var(--border)', marginTop: '4px', paddingTop: '4px' } },
               React.createElement('button', {
-                onClick: () => signOut(auth).then(() => window.location.href = 'index.html'),
+                onClick: () => signOut(auth).then(() => window.location.replace('index.html')),
                 style: {
                   display: 'flex', alignItems: 'center', gap: '10px', width: '100%', padding: '9px 16px',
                   background: 'none', border: 'none', cursor: 'pointer',
@@ -880,8 +888,8 @@ export function EditorPage({
         React.createElement('div', {
           style: {
             width: '100%', maxWidth: '460px',
-            background: 'var(--surface2)', border: '1px solid var(--border)',
-            borderRadius: R_BTN, padding: '14px 16px'
+            background: 'var(--surface)', border: '1px solid var(--border2)',
+            borderRadius: R_BTN, padding: '14px 16px', boxShadow: 'inset 0 0 0 1px var(--accent3)'
           }
         },
           React.createElement('div', {
@@ -890,7 +898,7 @@ export function EditorPage({
             React.createElement(Label, { style: { fontSize: '8px', letterSpacing: '3px', color: 'var(--muted)' } }, 'PREVIEW'),
             React.createElement('input', {
               value: previewText, onChange: e => setPreviewText(e.target.value),
-              placeholder: 'Texto de preview...',
+              placeholder: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit.',
               style: {
                 background: 'none', border: 'none', outline: 'none',
                 color: 'var(--muted2)', fontSize: '11px', fontFamily: FONT_MONO,

@@ -94,12 +94,11 @@ export function buildAndDownload(fontData, gridSize, filename, format, meta = {}
       path.close();
     });
 
-    const glyphWidth = bounds ? (bounds.widthCols * S) : S;
-    const onePixelPadding = S;
+    const glyphWidth = bounds ? (bounds.widthCols * S) : 0;
     const minAdvance = S;
     const advance = char === ' '
-      ? Math.max(minAdvance, onePixelPadding + Math.round(wordSpacing * 10))
-      : Math.max(minAdvance, glyphWidth + onePixelPadding + pxSpacing);
+      ? Math.max(minAdvance, Math.round(wordSpacing * 10))
+      : Math.max(minAdvance, glyphWidth + pxSpacing);
 
     glyphs.push(new ot.Glyph({
       name: char === ' ' ? 'space' : char,
