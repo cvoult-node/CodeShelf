@@ -37,6 +37,15 @@ export function shiftGrid(grid, size, dir) {
 }
 
 /**
+ * Calcula la fila de baseline para un gridSize dado.
+ * Para 12×12: baseline en fila 8 (deja 3 filas para descenders).
+ * Para otros tamaños: ~67% del alto.
+ */
+export function getBaselineRow(gridSize) {
+  return Math.round(gridSize * 0.67);
+}
+
+/**
  * Exportar font data → opentype.Font y descargar
  * @param {Object} meta - { fontName, author, letterSpacing, wordSpacing, extraSpace, unitsPerEm, ascender, descender }
  */
@@ -56,15 +65,19 @@ export function buildAndDownload(fontData, gridSize, filename, format, meta = {}
     author        = '',
     letterSpacing = 0,
     wordSpacing   = 10,
-    extraSpace    = 1, // Nuevo: margen extra por glifo
+    extraSpace    = 1,
     unitsPerEm    = 1000,
     ascender      = 800,
-    descender     = -200,
+    descender     = -250,
   } = meta;
 
+  // Escala: cada píxel → S unidades opentype
   const S = 100;
-  // El interletraje final es la suma del letterSpacing y el extraSpace (escalado)
   const pxSpacing = Math.round((letterSpacing + extraSpace) * 10);
+
+  // Fila de baseline (0-indexed desde arriba del grid)
+  // Para 12×12: fila 8, dejando filas 9-11 para descenders
+  const baselineRow = getBaselineRow(gridSize);
 
   const getGlyphBounds = (glyph = []) => {
     let minCol = gridSize, maxCol = -1;
@@ -85,29 +98,37 @@ export function buildAndDownload(fontData, gridSize, filename, format, meta = {}
   Object.keys(fontData).forEach(char => {
     const glyphGrid = fontData[char] || [];
     const bounds = getGlyphBounds(glyphGrid);
-    
-    // Si el glifo está vacío y no es el espacio, lo saltamos (Pedido por el usuario)
+
     if (!bounds && char !== ' ') return;
 
     const path = new ot.Path();
     if (bounds) {
       glyphGrid.forEach((on, i) => {
         if (!on) return;
+        const row = Math.floor(i / gridSize);
         const col = i % gridSize;
-        // Ajustamos X para que empiece en 0 (quitando espacios vacíos a la izquierda)
+
+        // X: desplazar para que empiece en 0 (sin margen izquierdo vacío)
         const x = (col - bounds.minCol) * S;
-        const y = (gridSize - 1 - Math.floor(i / gridSize)) * S;
-        path.moveTo(x, y); path.lineTo(x+S, y);
-        path.lineTo(x+S, y+S); path.lineTo(x, y+S);
+
+        // Y: positivo = sobre la baseline, negativo = descender
+        // row=0 (arriba del grid) → y más alto sobre baseline
+        // row=baselineRow → y=0 (baseline)
+        // row > baselineRow → y negativo (descender)
+        const y = (baselineRow - row) * S;
+
+        // Dibujar cuadrado de píxel (orientación opentype: y crece hacia arriba)
+        path.moveTo(x,     y);
+        path.lineTo(x + S, y);
+        path.lineTo(x + S, y + S);
+        path.lineTo(x,     y + S);
         path.close();
       });
     }
 
-    const glyphWidth = bounds ? (bounds.widthCols * S) : 0;
-    const minAdvance = S;
-    
-    // El avance del espacio usa wordSpacing
-    // El avance de otros caracteres usa su ancho real + espaciado configurado
+    const glyphWidth  = bounds ? (bounds.widthCols * S) : 0;
+    const minAdvance  = S;
+
     const advance = char === ' '
       ? Math.max(minAdvance, Math.round(wordSpacing * 10))
       : Math.max(minAdvance, glyphWidth + pxSpacing);

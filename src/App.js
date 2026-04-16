@@ -14,6 +14,9 @@ import { Overlay, Modal, Btn } from './ui.js';
 
 window.__opentype__ = opentype;
 
+// Grid por defecto: 12×12 (permite descenders en "g","p","q","y")
+const DEFAULT_GRID = 12;
+
 // ── ConfirmDialog — reemplaza confirm() nativo ─────────────────
 function ConfirmDialog({ message, onConfirm, onCancel }) {
   return React.createElement(Overlay, { onClose: onCancel },
@@ -44,29 +47,29 @@ function App() {
   useEffect(() => { document.documentElement.className = theme; }, [theme]);
 
   // ── Estado ──────────────────────────────────
-  const [status,        setStatus]        = useState('loading');
-  const [user,          setUser]          = useState(null);
-  const [errorMsg,      setErrorMsg]      = useState('');
-  const [proyectoActivo,setProyectoActivo] = useState(null);
-  const [proyectoNombre,setProyectoNombre] = useState('mi-fuente');
-  const [gridSize,      setGridSize]      = useState(8);
-  const [currentChar,   setCurrentChar]   = useState('A');
-  const [fontData,      setFontData]      = useState({});
-  const [grid,          setGrid]          = useState([]);
-  const [isSaving,      setIsSaving]      = useState(false);
-  const [tool,          setTool]          = useState('pencil');
-  const [previewText,   setPreviewText]   = useState('Lorem ipsum dolor sit amet, consectetur adipiscing elit.');
-  const [isPublishing,  setIsPublishing]  = useState(false);
-  const [publishedOk,   setPublishedOk]   = useState(false);
-  // Para reemplazar confirm() nativo con modal personalizado
-  const [confirmDialog, setConfirmDialog] = useState(null); // { message, onConfirm }
+  const [status,         setStatus]        = useState('loading');
+  const [user,           setUser]          = useState(null);
+  const [errorMsg,       setErrorMsg]      = useState('');
+  const [proyectoActivo, setProyectoActivo] = useState(null);
+  const [proyectoNombre, setProyectoNombre] = useState('mi-fuente');
+  const [gridSize,       setGridSize]      = useState(DEFAULT_GRID);
+  const [currentChar,    setCurrentChar]   = useState('A');
+  const [fontData,       setFontData]      = useState({});
+  const [grid,           setGrid]          = useState([]);
+  const [isSaving,       setIsSaving]      = useState(false);
+  const [tool,           setTool]          = useState('pencil');
+  const [previewText,    setPreviewText]   = useState('Lorem ipsum dolor sit amet, consectetur adipiscing elit.');
+  const [isPublishing,   setIsPublishing]  = useState(false);
+  const [publishedOk,    setPublishedOk]   = useState(false);
+  const [confirmDialog,  setConfirmDialog] = useState(null);
 
   const isDrawing = useRef(false);
   const drawMode  = useRef(true);
-  const debouncedSaveTimer = useRef(null);
   const undoStack = useRef([]);
   const redoStack = useRef([]);
 
+  // ── Guardar explícitamente (Ctrl+S / botón guardar) ──────────
+  // NO se llama automáticamente en cada cambio de píxel
   const handleSaveFont = useCallback(async (data) => {
     if (!user || !proyectoActivo) return;
     setIsSaving(true);
@@ -85,13 +88,7 @@ function App() {
     setIsSaving(false);
   }, [user, proyectoActivo, gridSize]);
 
-  // -- Debounce save: evita Firestore en cada pixel al dibujar
-  const scheduleSave = useCallback((data) => {
-    clearTimeout(debouncedSaveTimer.current);
-    debouncedSaveTimer.current = setTimeout(() => handleSaveFont(data), 800);
-  }, [handleSaveFont]);
-
-  // -- Undo / Redo (pila de hasta 50 pasos por sesion)
+  // -- Undo / Redo (pila de hasta 50 pasos por sesión)
   const pushHistory = useCallback((char, g) => {
     undoStack.current.push({ char, grid: [...g] });
     if (undoStack.current.length > 50) undoStack.current.shift();
@@ -104,12 +101,8 @@ function App() {
     redoStack.current.push({ char: currentChar, grid: [...(fontData[currentChar] || [])] });
     setCurrentChar(prev.char);
     setGrid(prev.grid);
-    setFontData(fd => {
-      const nfd = { ...fd, [prev.char]: prev.grid };
-      scheduleSave(nfd);
-      return nfd;
-    });
-  }, [currentChar, fontData, scheduleSave]);
+    setFontData(fd => ({ ...fd, [prev.char]: prev.grid }));
+  }, [currentChar, fontData]);
 
   const handleRedo = useCallback(() => {
     const next = redoStack.current.pop();
@@ -117,13 +110,8 @@ function App() {
     undoStack.current.push({ char: currentChar, grid: [...(fontData[currentChar] || [])] });
     setCurrentChar(next.char);
     setGrid(next.grid);
-    setFontData(fd => {
-      const nfd = { ...fd, [next.char]: next.grid };
-      scheduleSave(nfd);
-      return nfd;
-    });
-  }, [currentChar, fontData, scheduleSave]);
-
+    setFontData(fd => ({ ...fd, [next.char]: next.grid }));
+  }, [currentChar, fontData]);
 
   // ── Publish ─────────────────────────────────
   const handlePublish = useCallback(async (prevText) => {
@@ -131,10 +119,10 @@ function App() {
     setIsPublishing(true);
     try {
       await publishFont(user, {
-        id:       proyectoActivo,
-        nombre:   proyectoNombre,
+        id:     proyectoActivo,
+        nombre: proyectoNombre,
         gridSize,
-        font:     fontData
+        font:   fontData
       }, prevText || 'HELLO');
       setPublishedOk(true);
     } catch (err) {
@@ -159,25 +147,28 @@ function App() {
     if (tool === 'fill') {
       const filled = floodFill(grid, gridSize, i, drawMode.current);
       setGrid(filled);
+      // fill guarda inmediatamente porque es una acción puntual
       setFontData(fd => { const nfd = { ...fd, [currentChar]: filled }; handleSaveFont(nfd); return nfd; });
       return;
     }
-    setGrid(prev => { const next = applyPixelTool(prev, i); setFontData(fd => ({ ...fd, [currentChar]: next })); return next; });
+    setGrid(prev => {
+      const next = applyPixelTool(prev, i);
+      setFontData(fd => ({ ...fd, [currentChar]: next }));
+      return next;
+    });
   }, [tool, grid, gridSize, currentChar, applyPixelTool, handleSaveFont, pushHistory]);
 
+  // handlePixelEnter: solo actualiza estado, NO guarda en Firestore
   const handlePixelEnter = useCallback((i) => {
     if (!isDrawing.current || tool === 'fill') return;
     setGrid(prev => {
       const next = applyPixelTool(prev, i);
-      setFontData(fd => {
-        const nfd = { ...fd, [currentChar]: next };
-        scheduleSave(nfd); // debounced — no escribe en cada pixel
-        return nfd;
-      });
+      setFontData(fd => ({ ...fd, [currentChar]: next }));
       return next;
     });
-  }, [tool, currentChar, applyPixelTool, scheduleSave]);
+  }, [tool, currentChar, applyPixelTool]);
 
+  // handleMouseUp: guarda al soltar el ratón (1 guardado por trazo)
   const handleMouseUp = useCallback(() => {
     if (!isDrawing.current) return;
     isDrawing.current = false;
@@ -206,7 +197,7 @@ function App() {
     pushHistory(currentChar, grid);
     setGrid(prev => {
       const inv = prev.map(p => !p);
-      setFontData(fd => { const nfd = { ...fd, [currentChar]: inv }; handleSaveFont(nfd); return nfd; });
+      setFontData(fd => ({ ...fd, [currentChar]: inv }));
       return inv;
     });
   };
@@ -215,7 +206,7 @@ function App() {
     pushHistory(currentChar, grid);
     setGrid(prev => {
       const s = shiftGrid(prev, gridSize, dir);
-      setFontData(fd => { const nfd = { ...fd, [currentChar]: s }; handleSaveFont(nfd); return nfd; });
+      setFontData(fd => ({ ...fd, [currentChar]: s }));
       return s;
     });
   };
@@ -229,16 +220,17 @@ function App() {
       try {
         const p = JSON.parse(raw);
         if (!p || !p.id) throw new Error('Proyecto sin id');
+        const gs = p.gridSize || DEFAULT_GRID;
         setUser(u);
         setProyectoActivo(p.id);
         setProyectoNombre(p.nombre || 'mi-fuente');
-        setGridSize(p.gridSize || 8);
+        setGridSize(gs);
         setFontData(p.font || {});
-        setGrid((p.font?.['A']) ? p.font['A'] : Array((p.gridSize || 8) * (p.gridSize || 8)).fill(false));
+        setGrid(p.font?.['A'] || Array(gs * gs).fill(false));
         setCurrentChar('A');
         setStatus('ready');
       } catch (e) {
-        setErrorMsg('Proyecto invalido. Volviendo...');
+        setErrorMsg('Proyecto inválido. Volviendo...');
         setStatus('error');
         setTimeout(() => window.location.replace('feed.html'), 2000);
       }
@@ -259,7 +251,7 @@ function App() {
     return () => window.removeEventListener('keydown', handler);
   }, [fontData, handleSaveFont, handleUndo, handleRedo]);
 
-  // ── Loading / error states ───────────────────
+  // ── Loading / error ───────────────────────────
   if (status === 'loading') {
     return React.createElement('div', {
       style: { height: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '18px' }
@@ -285,22 +277,22 @@ function App() {
       user, isDark, toggleTheme,
       gridSize, currentChar, fontData, grid, isSaving,
       tool, setTool, previewText, setPreviewText,
-      onPixelDown:   handlePixelDown,
-      onPixelEnter:  handlePixelEnter,
-      onMouseUp:     handleMouseUp,
-      onSwitchChar:  switchChar,
-      onClearCanvas: clearCanvas,
-      onInvert:      invertCanvas,
-      onShift:       doShift,
-      onUndo:        handleUndo,
-      onRedo:        handleRedo,
-      onSave:        () => handleSaveFont(fontData),
-      onBack:        () => window.location.replace('feed.html'),
-      onPublish:     handlePublish,
+      onPixelDown:    handlePixelDown,
+      onPixelEnter:   handlePixelEnter,
+      onMouseUp:      handleMouseUp,
+      onSwitchChar:   switchChar,
+      onClearCanvas:  clearCanvas,
+      onInvert:       invertCanvas,
+      onShift:        doShift,
+      onUndo:         handleUndo,
+      onRedo:         handleRedo,
+      onSave:         () => handleSaveFont(fontData),
+      onBack:         () => window.location.replace('feed.html'),
+      onPublish:      handlePublish,
       isPublishing,
       publishedOk,
       onResetPublish: () => setPublishedOk(false),
-      projectName:   proyectoNombre
+      projectName:    proyectoNombre
     }),
     confirmDialog && React.createElement(ConfirmDialog, {
       message:   confirmDialog.message,
