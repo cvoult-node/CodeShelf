@@ -238,7 +238,7 @@ export function initFeedEvents(onCreateProject) {
       setTimeout(() => inputName.style.borderColor = '', 1000);
       return;
     }
-    const validName = /^[\p{L}\p{N}- ]+$/u.test(nombre);
+    const validName = /^[A-Za-z0-9À-ÖØ-öø-ÿ\u00C0-\u024F\- ]+$/.test(nombre)
     if (!validName) {
       inputName.focus();
       inputName.style.borderColor = 'var(--accent)';
