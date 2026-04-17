@@ -16,20 +16,48 @@
  * @param {string} color - Color de los píxeles activos
  * @param {number} letterSpacing - Espacio extra entre letras
  */
-export function renderTextOnCanvas(ctx, text, font, gridSize, pixelSize, x, y, color = '#e62222', letterSpacing = 1) {
-  const charWidth = gridSize * pixelSize + letterSpacing;
+export function getGlyphBounds(glyph, gridSize) {
+  if (!Array.isArray(glyph)) return null;
+  let minCol = gridSize, maxCol = -1;
+  let minRow = gridSize, maxRow = -1;
+  for (let i = 0; i < glyph.length; i++) {
+    if (!glyph[i]) continue;
+    const row = Math.floor(i / gridSize);
+    const col = i % gridSize;
+    if (col < minCol) minCol = col;
+    if (col > maxCol) maxCol = col;
+    if (row < minRow) minRow = row;
+    if (row > maxRow) maxRow = row;
+  }
+  if (maxCol < 0 || maxRow < 0) return null;
+  return { minCol, maxCol, minRow, maxRow };
+}
+
+export function glyphAdvanceCols(char, glyph, gridSize, wordSpacingCols = 3) {
+  if (char === ' ') return Math.max(1, wordSpacingCols);
+  const bounds = getGlyphBounds(glyph, gridSize);
+  if (!bounds) return gridSize;
+  return Math.max(1, bounds.maxCol - bounds.minCol + 1);
+}
+
+export function renderTextOnCanvas(ctx, text, font, gridSize, pixelSize, x, y, color = '#e62222', letterSpacing = 1, wordSpacingCols = 3) {
   let cursorX = x;
 
   for (const char of text.toUpperCase()) {
     const glyph = font[char];
-    if (!glyph) { cursorX += charWidth; continue; }
+    const bounds = getGlyphBounds(glyph, gridSize);
+    const advanceCols = glyphAdvanceCols(char, glyph, gridSize, wordSpacingCols);
+    if (!glyph || !bounds) {
+      cursorX += advanceCols * pixelSize + letterSpacing;
+      continue;
+    }
 
-    for (let row = 0; row < gridSize; row++) {
-      for (let col = 0; col < gridSize; col++) {
+    for (let row = bounds.minRow; row <= bounds.maxRow; row++) {
+      for (let col = bounds.minCol; col <= bounds.maxCol; col++) {
         if (glyph[row * gridSize + col]) {
           ctx.fillStyle = color;
           ctx.fillRect(
-            cursorX + col * pixelSize,
+            cursorX + (col - bounds.minCol) * pixelSize,
             y + row * pixelSize,
             pixelSize - 0.5,
             pixelSize - 0.5
@@ -37,7 +65,7 @@ export function renderTextOnCanvas(ctx, text, font, gridSize, pixelSize, x, y, c
         }
       }
     }
-    cursorX += charWidth;
+    cursorX += advanceCols * pixelSize + letterSpacing;
   }
 }
 
@@ -46,6 +74,20 @@ export function renderTextOnCanvas(ctx, text, font, gridSize, pixelSize, x, y, c
  */
 export function measureText(text, gridSize, pixelSize, letterSpacing = 1) {
   return text.length * (gridSize * pixelSize + letterSpacing);
+}
+
+/**
+ * Ancho real del texto según píxeles dibujados por glifo (sin contar columnas vacías laterales).
+ */
+export function measureTextByGlyphs(text, font, gridSize, pixelSize, letterSpacing = 1, wordSpacingCols = 3) {
+  let total = 0;
+  const chars = (text || '').toUpperCase().split('');
+  chars.forEach((char, idx) => {
+    const advanceCols = glyphAdvanceCols(char, font?.[char], gridSize, wordSpacingCols);
+    total += advanceCols * pixelSize;
+    if (idx < chars.length - 1) total += letterSpacing;
+  });
+  return total;
 }
 
 /**

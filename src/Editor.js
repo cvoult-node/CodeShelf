@@ -21,48 +21,77 @@ const PixelPreview = ({
 }) => {
   const chars = text.split('');
   const sz = Math.min(gridSize, 32);
+  const getBounds = (glyph) => {
+    if (!Array.isArray(glyph)) return null;
+    let minCol = sz, maxCol = -1, minRow = sz, maxRow = -1;
+    glyph.forEach((on, i) => {
+      if (!on) return;
+      const row = Math.floor(i / sz), col = i % sz;
+      if (col < minCol) minCol = col;
+      if (col > maxCol) maxCol = col;
+      if (row < minRow) minRow = row;
+      if (row > maxRow) maxRow = row;
+    });
+    return (maxCol < 0 || maxRow < 0) ? null : { minCol, maxCol, minRow, maxRow };
+  };
 
   return React.createElement('div', {
     style: {
       display: 'flex',
       gap: '0px',
-      flexWrap: 'wrap',
+      flexWrap: 'nowrap',
+      overflowX: 'auto',
+      overflowY: 'hidden',
+      whiteSpace: 'nowrap',
       padding: '8px',
       minHeight: '28px',
-      alignItems: 'center'
+      alignItems: 'flex-end',
+      scrollbarWidth: 'thin'
     }
   },
     chars.map((ch, ci) => {
       const glyph = fontData[ch];
+      const bounds = getBounds(glyph);
       const isSpace = ch === ' ';
       const spacingPx = isSpace ? wordSpacing * 0.22 : letterSpacing * pixelSize;
       const minSpaceWidth = Math.max(pixelSize * 2, 1);
       const computedSpaceWidth = Math.max(minSpaceWidth, pixelSize * 3 + wordSpacing * 0.2);
+      const glyphCols = bounds ? (bounds.maxCol - bounds.minCol + 1) : sz;
+      const glyphRows = bounds ? (bounds.maxRow - bounds.minRow + 1) : sz;
 
       return React.createElement('div', {
         key: ci,
         style: {
           display: 'grid',
-          gridTemplateColumns: `repeat(${sz},${pixelSize}px)`,
+          gridTemplateColumns: `repeat(${glyphCols},${pixelSize}px)`,
+          gridTemplateRows: `repeat(${glyphRows},${pixelSize}px)`,
           position: 'relative',
           width: isSpace ? `${computedSpaceWidth}px` : undefined,
           minWidth: isSpace ? `${minSpaceWidth}px` : undefined,
           marginRight: `${spacingPx}px`,
           border: (isSpace && showSpaceMarker) ? '1px dashed var(--border)' : 'none',
           borderRadius: '4px',
-          padding: (isSpace && showSpaceMarker) ? '2px' : 0
+          padding: (isSpace && showSpaceMarker) ? '2px' : 0,
+          flexShrink: 0,
+          alignSelf: 'flex-end'
         }
       },
-        Array(sz * sz).fill(0).map((_, pi) =>
+        Array(glyphCols * glyphRows).fill(0).map((_, pi) => {
+          const row = Math.floor(pi / glyphCols);
+          const col = pi % glyphCols;
+          const sourceRow = bounds ? row + bounds.minRow : row;
+          const sourceCol = bounds ? col + bounds.minCol : col;
+          const sourceIdx = sourceRow * sz + sourceCol;
+          return (
           React.createElement('div', {
             key: pi,
             style: {
               width: `${pixelSize}px`,
               height: `${pixelSize}px`,
-              background: glyph?.[pi] ? color : 'transparent'
+              background: glyph?.[sourceIdx] ? color : 'transparent'
             }
           })
-        ),
+        )}),
         (isSpace && showSpaceMarker) && React.createElement('div', {
           style: {
             position: 'absolute', top: '2px', bottom: '2px', left: '50%',
@@ -378,7 +407,14 @@ const PublishModal = ({ projectName, fontData, gridSize, onClose, onPublish, isP
 };
 
 // ── Preferences modal ─────────────────────────
-const PreferencesModal = ({ onClose, showSpaceMarker, setShowSpaceMarker }) =>
+const PreferencesModal = ({
+  onClose,
+  showSpaceMarker, setShowSpaceMarker,
+  showCenterGuide, setShowCenterGuide,
+  centerGuideCol, setCenterGuideCol,
+  xHeightGuideRow, setXHeightGuideRow,
+  gridSize
+}) =>
   React.createElement(Overlay, { onClose },
     React.createElement(Modal, { style: { maxWidth: '460px', gap: '16px' } },
       React.createElement('h3', {
@@ -395,6 +431,13 @@ const PreferencesModal = ({ onClose, showSpaceMarker, setShowSpaceMarker }) =>
             desc: 'Activa una referencia visual para editar el espacio sin confundirlo con celdas vacías.',
             val: showSpaceMarker,
             setVal: setShowSpaceMarker
+          },
+          {
+            id: 'center-guide',
+            title: 'Guía vertical editable',
+            desc: 'Muestra/oculta la línea vertical y permite mover su columna desde esta pantalla.',
+            val: showCenterGuide,
+            setVal: setShowCenterGuide
           }
         ].map(item =>
           React.createElement('button', {
@@ -421,17 +464,47 @@ const PreferencesModal = ({ onClose, showSpaceMarker, setShowSpaceMarker }) =>
           )
         )
       ),
+      React.createElement('div', {
+        style: {
+          background: 'var(--surface2)',
+          border: '1px solid var(--border)',
+          borderRadius: R_BTN,
+          padding: '10px 12px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '10px'
+        }
+      },
+        React.createElement('div', { style: { fontFamily: FONT_MONO, fontSize: '10px', color: 'var(--muted)' } }, `Fila X-Height (${xHeightGuideRow})`),
+        React.createElement('input', {
+          type: 'range',
+          min: 0,
+          max: Math.max(0, gridSize - 1),
+          value: xHeightGuideRow,
+          onChange: e => setXHeightGuideRow(Number(e.target.value)),
+          style: { width: '100%', accentColor: ACCENT, cursor: 'pointer' }
+        }),
+        React.createElement('div', { style: { fontFamily: FONT_MONO, fontSize: '10px', color: 'var(--muted)' } }, `Columna guía vertical (${centerGuideCol})`),
+        React.createElement('input', {
+          type: 'range',
+          min: 0,
+          max: Math.max(0, gridSize - 1),
+          value: centerGuideCol,
+          onChange: e => setCenterGuideCol(Number(e.target.value)),
+          style: { width: '100%', accentColor: ACCENT, cursor: 'pointer' }
+        })
+      ),
       React.createElement(Btn, { onClick: onClose, style: { alignSelf: 'flex-end' } }, 'Listo')
     )
   );
 
 // ── Guide overlay SVG ─────────────────────────
 // Guías estilo foto de referencia: líneas rojas en posiciones de filas/columnas clave
-const GuideOverlay = ({ gridSize }) => {
+const GuideOverlay = ({ gridSize, xHeightGuideRow, centerGuideCol, showCenterGuide }) => {
   const lines = [];
 
   const capRow       = 1;
-  const xHeightRow   = Math.round(gridSize * 0.33);
+  const xHeightRow   = Math.min(gridSize - 1, Math.max(0, xHeightGuideRow ?? Math.round(gridSize * 0.33)));
   const baselineRow  = getBaselineRow(gridSize);
   const descenderRow = gridSize - 1;
 
@@ -448,13 +521,15 @@ const GuideOverlay = ({ gridSize }) => {
   );
 
   // Línea vertical roja (a 2 columnas del borde, como la foto)
-  const col2pct = (2 / gridSize * 100).toFixed(4);
-  lines.push(
-    React.createElement('line', {
-      key: 'vl', x1: `${col2pct}%`, y1: '0', x2: `${col2pct}%`, y2: '100%',
-      stroke: 'rgba(191,69,69,0.70)', strokeWidth: '1.5'
-    })
-  );
+  if (showCenterGuide) {
+    const centerColPct = (centerGuideCol / gridSize * 100).toFixed(4);
+    lines.push(
+      React.createElement('line', {
+        key: 'vl', x1: `${centerColPct}%`, y1: '0', x2: `${centerColPct}%`, y2: '100%',
+        stroke: 'rgba(191,69,69,0.70)', strokeWidth: '1.5'
+      })
+    );
+  }
 
   // Helper: línea horizontal nombrada
   const guide = (key, row, label, opacity, strokeW, dash) => {
@@ -519,6 +594,9 @@ export function EditorPage({
   const [avatarColor,     setAvatarColor]     = useState(ACCENT);
   const [showGuides,      setShowGuides]      = useState(true);
   const [showSpaceMarker, setShowSpaceMarker] = useState(() => localStorage.getItem('cs-show-space-marker') !== '0');
+  const [showCenterGuide, setShowCenterGuide] = useState(() => localStorage.getItem('cs-show-center-guide') !== '0');
+  const [centerGuideCol,  setCenterGuideCol]  = useState(() => Number(localStorage.getItem('cs-center-guide-col') ?? 2));
+  const [xHeightGuideRow, setXHeightGuideRow] = useState(() => Number(localStorage.getItem('cs-xheight-guide-row') ?? Math.round(gridSize * 0.33)));
 
   const avatarInit = (user?.displayName || user?.email || '?')[0].toUpperCase();
 
@@ -542,6 +620,19 @@ export function EditorPage({
   useEffect(() => {
     localStorage.setItem('cs-show-space-marker', showSpaceMarker ? '1' : '0');
   }, [showSpaceMarker]);
+  useEffect(() => {
+    localStorage.setItem('cs-show-center-guide', showCenterGuide ? '1' : '0');
+  }, [showCenterGuide]);
+  useEffect(() => {
+    const clamped = Math.max(0, Math.min(gridSize - 1, centerGuideCol || 0));
+    if (clamped !== centerGuideCol) setCenterGuideCol(clamped);
+    localStorage.setItem('cs-center-guide-col', String(clamped));
+  }, [centerGuideCol, gridSize]);
+  useEffect(() => {
+    const clamped = Math.max(0, Math.min(gridSize - 1, xHeightGuideRow || 0));
+    if (clamped !== xHeightGuideRow) setXHeightGuideRow(clamped);
+    localStorage.setItem('cs-xheight-guide-row', String(clamped));
+  }, [xHeightGuideRow, gridSize]);
 
   const modeTools = [
     { id: 'pencil',   iconName: 'pencil',   label: 'LIBRE'   },
@@ -912,7 +1003,12 @@ export function EditorPage({
               }
             })
           ),
-          React.createElement(GuideOverlay, { gridSize })
+          React.createElement(GuideOverlay, {
+            gridSize,
+            xHeightGuideRow,
+            centerGuideCol,
+            showCenterGuide
+          })
         ),
 
         // preview moved to left sidebar below
@@ -1028,7 +1124,14 @@ export function EditorPage({
     showPrefs && React.createElement(PreferencesModal, {
       onClose: () => setShowPrefs(false),
       showSpaceMarker,
-      setShowSpaceMarker
+      setShowSpaceMarker,
+      showCenterGuide,
+      setShowCenterGuide,
+      centerGuideCol,
+      setCenterGuideCol,
+      xHeightGuideRow,
+      setXHeightGuideRow,
+      gridSize
     })
   );
 }
