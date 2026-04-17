@@ -118,7 +118,9 @@ export function buildAndDownload(fontData, gridSize, filename, format, meta = {}
         // row=0 (arriba del grid) → y más alto sobre baseline
         // row=baselineRow → y=0 (baseline)
         // row > baselineRow → y negativo (descender)
-        const y = (baselineRow - row) * S;
+        // Cada píxel debe "apoyar" su borde inferior en baseline cuando row === baselineRow.
+        // Con esto evitamos que toda la fuente quede ~1px (S unidades) más arriba.
+        const y = (baselineRow - row - 1) * S;
 
         // Dibujar cuadrado de píxel (orientación opentype: y crece hacia arriba)
         path.moveTo(x,     y);
@@ -133,7 +135,7 @@ export function buildAndDownload(fontData, gridSize, filename, format, meta = {}
     const minAdvance  = S;
 
     const advance = char === ' '
-      ? Math.max(minAdvance, Math.round(wordSpacing * 10))
+      ? Math.max(minAdvance, Math.round(wordSpacing * S))
       : Math.max(minAdvance, glyphWidth + pxSpacing);
 
     glyphs.push(new ot.Glyph({
