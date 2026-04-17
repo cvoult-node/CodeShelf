@@ -1,12 +1,24 @@
 // ─────────────────────────────────────────────
-// pixelRenderer.js (PRO + COMPATIBLE)
+// pixelRenderer.js (ULTRA PRO + SAFE)
 // ─────────────────────────────────────────────
 
+// 🔥 Cache de bounds
 const glyphCache = new WeakMap();
 
-/**
- * Obtiene los límites reales del glifo (columnas usadas)
- */
+// 🎯 Defaults centralizados
+const DEFAULTS = {
+  pixelSize: 3,
+  color: '#e62222',
+  letterSpacing: 1,
+  wordSpacingCols: 3,
+  align: 'left',
+  lineHeight: 1.2
+};
+
+// ─────────────────────────────────────────────
+// 🧠 CORE
+// ─────────────────────────────────────────────
+
 export function getGlyphBounds(glyph, gridSize) {
   if (!Array.isArray(glyph)) return null;
 
@@ -36,21 +48,47 @@ export function getGlyphBounds(glyph, gridSize) {
   return result;
 }
 
-/**
- * Calcula cuánto avanza un carácter
- */
-export function glyphAdvanceCols(char, glyph, gridSize, wordSpacingCols = 3) {
+export function glyphAdvanceCols(char, glyph, gridSize, wordSpacingCols = DEFAULTS.wordSpacingCols) {
   if (char === ' ') return Math.max(1, wordSpacingCols);
 
   const bounds = getGlyphBounds(glyph, gridSize);
-  if (!bounds) return gridSize;
-
-  return Math.max(1, bounds.width);
+  return bounds ? bounds.width : gridSize;
 }
 
-/**
- * Renderiza texto en canvas
- */
+// ─────────────────────────────────────────────
+// 📏 MÉTRICAS
+// ─────────────────────────────────────────────
+
+export function measureText(text, gridSize, pixelSize, letterSpacing = 1) {
+  return text.length * (gridSize * pixelSize + letterSpacing);
+}
+
+export function measureTextByGlyphs(
+  text,
+  font,
+  gridSize,
+  pixelSize,
+  letterSpacing = DEFAULTS.letterSpacing,
+  wordSpacingCols = DEFAULTS.wordSpacingCols
+) {
+  let total = 0;
+  const chars = (text || '').toUpperCase();
+
+  for (let i = 0; i < chars.length; i++) {
+    const char = chars[i];
+    const advance = glyphAdvanceCols(char, font?.[char], gridSize, wordSpacingCols);
+
+    total += advance * pixelSize;
+    if (i < chars.length - 1) total += letterSpacing;
+  }
+
+  return total;
+}
+
+// ─────────────────────────────────────────────
+// 🎨 RENDER
+// ─────────────────────────────────────────────
+
 export function renderTextOnCanvas(
   ctx,
   text,
@@ -59,14 +97,18 @@ export function renderTextOnCanvas(
   pixelSize,
   x,
   y,
-  color = '#e62222',
-  letterSpacing = 1,
-  wordSpacingCols = 3,
-  align = 'left',
-  lineHeight = 1.2
+  color = DEFAULTS.color,
+  letterSpacing = DEFAULTS.letterSpacing,
+  wordSpacingCols = DEFAULTS.wordSpacingCols,
+  align = DEFAULTS.align,
+  lineHeight = DEFAULTS.lineHeight
 ) {
+  if (!ctx || !font) return;
+
   const lines = (text || '').toUpperCase().split('\n');
   const lineHeightPx = gridSize * pixelSize * lineHeight;
+
+  ctx.fillStyle = color; // 🔥 set una sola vez
 
   lines.forEach((line, lineIndex) => {
     let cursorX = x;
@@ -80,10 +122,12 @@ export function renderTextOnCanvas(
       wordSpacingCols
     );
 
+    // 🎯 alineación
     if (align === 'center') cursorX -= lineWidth / 2;
-    if (align === 'right') cursorX -= lineWidth;
+    else if (align === 'right') cursorX -= lineWidth;
 
-    for (const char of line) {
+    for (let i = 0; i < line.length; i++) {
+      const char = line[i];
       const glyph = font[char];
       const bounds = getGlyphBounds(glyph, gridSize);
       const advance = glyphAdvanceCols(char, glyph, gridSize, wordSpacingCols);
@@ -94,16 +138,17 @@ export function renderTextOnCanvas(
       }
 
       for (let row = 0; row < gridSize; row++) {
+        const rowOffset = row * gridSize;
+
         for (let col = bounds.minCol; col <= bounds.maxCol; col++) {
-          if (glyph[row * gridSize + col]) {
-            ctx.fillStyle = color;
-            ctx.fillRect(
-              cursorX + (col - bounds.minCol) * pixelSize,
-              y + lineIndex * lineHeightPx + row * pixelSize,
-              pixelSize - 0.5,
-              pixelSize - 0.5
-            );
-          }
+          if (!glyph[rowOffset + col]) continue;
+
+          ctx.fillRect(
+            cursorX + (col - bounds.minCol) * pixelSize,
+            y + lineIndex * lineHeightPx + row * pixelSize,
+            pixelSize,
+            pixelSize
+          );
         }
       }
 
@@ -112,71 +157,35 @@ export function renderTextOnCanvas(
   });
 }
 
-/**
- * Medición simple (legacy)
- */
-export function measureText(text, gridSize, pixelSize, letterSpacing = 1) {
-  return text.length * (gridSize * pixelSize + letterSpacing);
-}
+// ─────────────────────────────────────────────
+// 🧾 CANVAS FACTORY
+// ─────────────────────────────────────────────
 
-/**
- * Medición real basada en glifos
- */
-export function measureTextByGlyphs(
-  text,
-  font,
-  gridSize,
-  pixelSize,
-  letterSpacing = 1,
-  wordSpacingCols = 3
-) {
-  let total = 0;
-  const chars = (text || '').toUpperCase().split('');
-
-  chars.forEach((char, idx) => {
-    const advance = glyphAdvanceCols(char, font?.[char], gridSize, wordSpacingCols);
-    total += advance * pixelSize;
-
-    if (idx < chars.length - 1) total += letterSpacing;
-  });
-
-  return total;
-}
-
-/**
- * Crea canvas con texto
- */
 export function createTextCanvas(
   text,
   font,
   gridSize,
-  {
-    pixelSize = 3,
-    color = '#e62222',
-    bgColor = 'transparent',
-    letterSpacing = 2,
-    paddingX = 12,
-    paddingY = 10,
-    align = 'left'
-  } = {}
+  options = {}
 ) {
+  const opts = { ...DEFAULTS, ...options };
+
   const lines = (text || '').split('\n');
 
   const widths = lines.map(line =>
-    measureTextByGlyphs(line, font, gridSize, pixelSize, letterSpacing)
+    measureTextByGlyphs(line, font, gridSize, opts.pixelSize, opts.letterSpacing)
   );
 
-  const maxWidth = Math.max(...widths);
-  const height = lines.length * gridSize * pixelSize;
+  const maxWidth = Math.max(...widths, 10);
+  const height = lines.length * gridSize * opts.pixelSize;
 
   const canvas = document.createElement('canvas');
-  canvas.width = Math.max(maxWidth + paddingX * 2, 10);
-  canvas.height = Math.max(height + paddingY * 2, 10);
+  canvas.width = maxWidth + (opts.paddingX || 12) * 2;
+  canvas.height = height + (opts.paddingY || 10) * 2;
 
   const ctx = canvas.getContext('2d');
 
-  if (bgColor !== 'transparent') {
-    ctx.fillStyle = bgColor;
+  if (opts.bgColor && opts.bgColor !== 'transparent') {
+    ctx.fillStyle = opts.bgColor;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
   }
 
@@ -185,21 +194,23 @@ export function createTextCanvas(
     text,
     font,
     gridSize,
-    pixelSize,
-    paddingX + (align === 'center' ? maxWidth / 2 : align === 'right' ? maxWidth : 0),
-    paddingY,
-    color,
-    letterSpacing,
-    3,
-    align
+    opts.pixelSize,
+    (opts.paddingX || 12) + (opts.align === 'center' ? maxWidth / 2 : opts.align === 'right' ? maxWidth : 0),
+    (opts.paddingY || 10),
+    opts.color,
+    opts.letterSpacing,
+    opts.wordSpacingCols,
+    opts.align,
+    opts.lineHeight
   );
 
   return canvas;
 }
 
-/**
- * Grid visual para preview de glifos
- */
+// ─────────────────────────────────────────────
+// 🔍 DEBUG / UI
+// ─────────────────────────────────────────────
+
 export function createGlyphGrid(glyph, gridSize, pixelSize = 3, color = '#e62222') {
   const wrap = document.createElement('div');
 
@@ -218,7 +229,7 @@ export function createGlyphGrid(glyph, gridSize, pixelSize = 3, color = '#e62222
       width:${pixelSize}px;
       height:${pixelSize}px;
       background:${
-        (glyph && glyph[i]) ? color : 'rgba(255,255,255,0.04)'
+        (glyph && glyph[i]) ? color : 'rgba(255,255,255,0.05)'
       };
     `;
 
@@ -228,19 +239,17 @@ export function createGlyphGrid(glyph, gridSize, pixelSize = 3, color = '#e62222
   return wrap;
 }
 
-/**
- * Cuenta glifos activos
- */
+// ─────────────────────────────────────────────
+// 🧰 UTILIDADES
+// ─────────────────────────────────────────────
+
 export function countGlyphs(font) {
   return Object.values(font || {}).filter(g => Array.isArray(g) && g.some(Boolean)).length;
 }
 
-/**
- * Nombre nuevo (pro)
- */
 export function getAvailableChars(font) {
   return Object.keys(font || {}).filter(k => font[k]?.some(Boolean));
 }
 
-
+// 🔥 compatibilidad total
 export const availableChars = getAvailableChars;
