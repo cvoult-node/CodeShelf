@@ -6,6 +6,13 @@ import { auth, signOut } from './firebase.js';
 import { ACCENT, TECLADO, R_CARD, R_BTN, FONT_MONO, FONT_PIXEL } from './constants.js';
 import { Btn, Icon, Overlay, Modal, Label } from './ui.js';
 import { buildAndDownload, getBaselineRow } from './canvas.js';
+import {
+  EDITOR_STORAGE_KEYS,
+  readBoolSetting,
+  readNumberSetting,
+  writeSetting,
+  defaultGuideRows
+} from './editorConfig.js';
 
 // ── Pixel preview helper ──────────────────────
 const PixelPreview = ({
@@ -21,48 +28,75 @@ const PixelPreview = ({
 }) => {
   const chars = text.split('');
   const sz = Math.min(gridSize, 32);
+  const getBounds = (glyph) => {
+    if (!Array.isArray(glyph)) return null;
+    let minCol = sz, maxCol = -1;
+    glyph.forEach((on, i) => {
+      if (!on) return;
+      const col = i % sz;
+      if (col < minCol) minCol = col;
+      if (col > maxCol) maxCol = col;
+    });
+    return maxCol < 0 ? null : { minCol, maxCol };
+  };
 
   return React.createElement('div', {
     style: {
       display: 'flex',
       gap: '0px',
-      flexWrap: 'wrap',
+      flexWrap: 'nowrap',
+      overflowX: 'auto',
+      overflowY: 'hidden',
+      whiteSpace: 'nowrap',
       padding: '8px',
       minHeight: '28px',
-      alignItems: 'center'
+      alignItems: 'flex-end',
+      scrollbarWidth: 'thin'
     }
   },
     chars.map((ch, ci) => {
       const glyph = fontData[ch];
+      const bounds = getBounds(glyph);
       const isSpace = ch === ' ';
       const spacingPx = isSpace ? wordSpacing * 0.22 : letterSpacing * pixelSize;
       const minSpaceWidth = Math.max(pixelSize * 2, 1);
       const computedSpaceWidth = Math.max(minSpaceWidth, pixelSize * 3 + wordSpacing * 0.2);
+      const glyphCols = bounds ? (bounds.maxCol - bounds.minCol + 1) : sz;
+      const glyphRows = sz;
 
       return React.createElement('div', {
         key: ci,
         style: {
           display: 'grid',
-          gridTemplateColumns: `repeat(${sz},${pixelSize}px)`,
+          gridTemplateColumns: `repeat(${glyphCols},${pixelSize}px)`,
+          gridTemplateRows: `repeat(${glyphRows},${pixelSize}px)`,
           position: 'relative',
           width: isSpace ? `${computedSpaceWidth}px` : undefined,
           minWidth: isSpace ? `${minSpaceWidth}px` : undefined,
           marginRight: `${spacingPx}px`,
           border: (isSpace && showSpaceMarker) ? '1px dashed var(--border)' : 'none',
           borderRadius: '4px',
-          padding: (isSpace && showSpaceMarker) ? '2px' : 0
+          padding: (isSpace && showSpaceMarker) ? '2px' : 0,
+          flexShrink: 0,
+          alignSelf: 'flex-end'
         }
       },
-        Array(sz * sz).fill(0).map((_, pi) =>
+        Array(glyphCols * glyphRows).fill(0).map((_, pi) => {
+          const row = Math.floor(pi / glyphCols);
+          const col = pi % glyphCols;
+          const sourceRow = row;
+          const sourceCol = bounds ? col + bounds.minCol : col;
+          const sourceIdx = sourceRow * sz + sourceCol;
+          return (
           React.createElement('div', {
             key: pi,
             style: {
               width: `${pixelSize}px`,
               height: `${pixelSize}px`,
-              background: glyph?.[pi] ? color : 'transparent'
+              background: glyph?.[sourceIdx] ? color : 'transparent'
             }
           })
-        ),
+        )}),
         (isSpace && showSpaceMarker) && React.createElement('div', {
           style: {
             position: 'absolute', top: '2px', bottom: '2px', left: '50%',
@@ -378,62 +412,273 @@ const PublishModal = ({ projectName, fontData, gridSize, onClose, onPublish, isP
 };
 
 // ── Preferences modal ─────────────────────────
-const PreferencesModal = ({ onClose, showSpaceMarker, setShowSpaceMarker }) =>
-  React.createElement(Overlay, { onClose },
-    React.createElement(Modal, { style: { maxWidth: '460px', gap: '16px' } },
+const PreferencesModal = ({
+  onClose,
+  showSpaceMarker, setShowSpaceMarker,
+  showCenterGuide, setShowCenterGuide,
+  centerGuideCol, setCenterGuideCol,
+  capGuideRow, setCapGuideRow,
+  xHeightGuideRow, setXHeightGuideRow,
+  baselineGuideRow, setBaselineGuideRow,
+  descGuideRow, setDescGuideRow,
+  gridSize
+}) => {
+  const [menu, setMenu] = useState('guides');
+  const previewSize = 16;
+
+  const menuButton = (id, label) => React.createElement('button', {
+    key: id,
+    onClick: () => setMenu(id),
+    style: {
+      width: '100%',
+      textAlign: 'left',
+      background: menu === id ? 'var(--accent3)' : 'transparent',
+      border: menu === id ? '1px solid var(--border-accent)' : '1px solid transparent',
+      borderRadius: R_BTN,
+      color: menu === id ? 'var(--text)' : 'var(--muted)',
+      fontFamily: FONT_MONO,
+      fontSize: '10px',
+      letterSpacing: '1px',
+      padding: '9px 10px',
+      cursor: 'pointer'
+    }
+  }, label);
+
+  const toggleCard = (title, desc, val, setVal) =>
+    React.createElement('button', {
+      onClick: () => setVal(v => !v),
+      style: {
+        width: '100%', textAlign: 'left',
+        background: val ? 'var(--accent3)' : 'var(--surface2)',
+        border: val ? '1px solid var(--border-accent)' : '1px solid var(--border)',
+        borderRadius: R_BTN, padding: '11px 12px', cursor: 'pointer'
+      }
+    },
+      React.createElement('div', {
+        style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }
+      },
+        React.createElement('span', { style: { fontFamily: FONT_MONO, fontSize: '11px', color: 'var(--text)' } }, title),
+        React.createElement('span', {
+          style: { fontFamily: FONT_MONO, fontSize: '10px', color: val ? ACCENT : 'var(--muted)' }
+        }, val ? 'ACTIVO' : 'INACTIVO')
+      ),
+      React.createElement('div', {
+        style: { fontFamily: FONT_MONO, fontSize: '9px', color: 'var(--muted2)', lineHeight: 1.5 }
+      }, desc)
+    );
+
+  const guidePreview = React.createElement('div', {
+    style: {
+      width: '180px', height: '180px', alignSelf: 'center',
+      position: 'relative', border: '1px solid var(--border)',
+      borderRadius: '10px', overflow: 'hidden',
+      background: 'var(--surface2)'
+    }
+  },
+    React.createElement('div', {
+      style: {
+        position: 'absolute', inset: 0,
+        display: 'grid',
+        gridTemplateColumns: `repeat(${previewSize}, 1fr)`,
+        gridTemplateRows: `repeat(${previewSize}, 1fr)`,
+        gap: '1px', background: 'var(--grid-line)'
+      }
+    },
+      Array(previewSize * previewSize).fill(0).map((_, i) =>
+        React.createElement('div', { key: i, style: { background: 'var(--empty)' } })
+      )
+    ),
+    React.createElement('div', {
+      style: {
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        top: `${(capGuideRow / Math.max(1, gridSize)) * 100}%`,
+        height: '2px',
+        background: 'rgba(191,69,69,.35)'
+      }
+    }),
+    React.createElement('div', {
+      style: {
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        top: `${(xHeightGuideRow / Math.max(1, gridSize)) * 100}%`,
+        height: '2px',
+        background: 'rgba(191,69,69,.65)'
+      }
+    }),
+    React.createElement('div', {
+      style: {
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        top: `${(baselineGuideRow / Math.max(1, gridSize)) * 100}%`,
+        height: '2px',
+        background: 'rgba(191,69,69,.9)'
+      }
+    }),
+    React.createElement('div', {
+      style: {
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        top: `${(descGuideRow / Math.max(1, gridSize)) * 100}%`,
+        height: '1px',
+        background: 'rgba(191,69,69,.45)'
+      }
+    }),
+    showCenterGuide && React.createElement('div', {
+      style: {
+        position: 'absolute',
+        top: 0,
+        bottom: 0,
+        left: `${(centerGuideCol / Math.max(1, gridSize)) * 100}%`,
+        width: '2px',
+        background: 'rgba(191,69,69,.8)'
+      }
+    })
+  );
+
+  return React.createElement(Overlay, { onClose },
+    React.createElement(Modal, { style: { maxWidth: '760px', width: '760px', gap: '16px' } },
       React.createElement('h3', {
         style: { margin: 0, fontFamily: FONT_PIXEL, fontSize: '10px', color: ACCENT, letterSpacing: '2px' }
       }, 'PREFERENCIAS DEL EDITOR'),
-      React.createElement('p', {
-        style: { margin: 0, fontFamily: FONT_MONO, fontSize: '10px', color: 'var(--muted)', lineHeight: '1.6' }
-      }, 'Ajusta la visualización del editor para dibujar con más precisión y menos ruido visual.'),
-      React.createElement('div', { style: { display: 'grid', gap: '10px' } },
-        [
-          {
-            id: 'space',
-            title: 'Marcador del carácter espacio',
-            desc: 'Activa una referencia visual para editar el espacio sin confundirlo con celdas vacías.',
-            val: showSpaceMarker,
-            setVal: setShowSpaceMarker
+      React.createElement('div', {
+        style: { display: 'grid', gridTemplateColumns: '180px 1fr', gap: '14px', minHeight: '350px' }
+      },
+        React.createElement('aside', {
+          style: {
+            border: '1px solid var(--border)',
+            borderRadius: R_BTN,
+            background: 'var(--surface2)',
+            padding: '10px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '8px'
           }
-        ].map(item =>
-          React.createElement('button', {
-            key: item.id,
-            onClick: () => item.setVal(v => !v),
-            style: {
-              width: '100%', textAlign: 'left',
-              background: item.val ? 'var(--accent3)' : 'var(--surface2)',
-              border: item.val ? '1px solid var(--border-accent)' : '1px solid var(--border)',
-              borderRadius: R_BTN, padding: '11px 12px', cursor: 'pointer'
-            }
-          },
-            React.createElement('div', {
-              style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }
-            },
-              React.createElement('span', { style: { fontFamily: FONT_MONO, fontSize: '11px', color: 'var(--text)' } }, item.title),
-              React.createElement('span', {
-                style: { fontFamily: FONT_MONO, fontSize: '10px', color: item.val ? ACCENT : 'var(--muted)' }
-              }, item.val ? 'ACTIVO' : 'INACTIVO')
+        },
+          React.createElement('div', { style: { fontFamily: FONT_MONO, fontSize: '8px', color: 'var(--muted)', letterSpacing: '2px' } }, 'MENÚ'),
+          menuButton('guides', 'Guías'),
+          menuButton('view', 'Vista')
+        ),
+        React.createElement('section', {
+          style: {
+            border: '1px solid var(--border)',
+            borderRadius: R_BTN,
+            background: 'var(--surface)',
+            padding: '14px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '12px'
+          }
+        },
+          menu === 'guides' && React.createElement(React.Fragment, null,
+            React.createElement('p', {
+              style: { margin: 0, fontFamily: FONT_MONO, fontSize: '10px', color: 'var(--muted)', lineHeight: '1.6' }
+            }, 'Ajusta líneas guía y su posición. Usa la mini preview para ver dónde quedarán.'),
+            toggleCard(
+              'Guía vertical editable',
+              'Muestra/oculta la línea vertical y permite mover su columna.',
+              showCenterGuide,
+              setShowCenterGuide
             ),
             React.createElement('div', {
-              style: { fontFamily: FONT_MONO, fontSize: '9px', color: 'var(--muted2)', lineHeight: 1.5 }
-            }, item.desc)
+              style: {
+                background: 'var(--surface2)',
+                border: '1px solid var(--border)',
+                borderRadius: R_BTN,
+                padding: '10px 12px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '10px'
+              }
+            },
+              React.createElement('div', { style: { fontFamily: FONT_MONO, fontSize: '10px', color: 'var(--muted)' } }, `Fila CAP (${capGuideRow})`),
+              React.createElement('input', {
+                type: 'range',
+                min: 0,
+                max: Math.max(0, gridSize - 1),
+                value: capGuideRow,
+                onChange: e => setCapGuideRow(Number(e.target.value)),
+                style: { width: '100%', accentColor: ACCENT, cursor: 'pointer' }
+              }),
+              React.createElement('div', { style: { fontFamily: FONT_MONO, fontSize: '10px', color: 'var(--muted)' } }, `Fila X-Height (${xHeightGuideRow})`),
+              React.createElement('input', {
+                type: 'range',
+                min: 0,
+                max: Math.max(0, gridSize - 1),
+                value: xHeightGuideRow,
+                onChange: e => setXHeightGuideRow(Number(e.target.value)),
+                style: { width: '100%', accentColor: ACCENT, cursor: 'pointer' }
+              }),
+              React.createElement('div', { style: { fontFamily: FONT_MONO, fontSize: '10px', color: 'var(--muted)' } }, `Fila BASE (${baselineGuideRow})`),
+              React.createElement('input', {
+                type: 'range',
+                min: 0,
+                max: Math.max(0, gridSize - 1),
+                value: baselineGuideRow,
+                onChange: e => setBaselineGuideRow(Number(e.target.value)),
+                style: { width: '100%', accentColor: ACCENT, cursor: 'pointer' }
+              }),
+              React.createElement('div', { style: { fontFamily: FONT_MONO, fontSize: '10px', color: 'var(--muted)' } }, `Fila DESC (${descGuideRow})`),
+              React.createElement('input', {
+                type: 'range',
+                min: 0,
+                max: Math.max(0, gridSize - 1),
+                value: descGuideRow,
+                onChange: e => setDescGuideRow(Number(e.target.value)),
+                style: { width: '100%', accentColor: ACCENT, cursor: 'pointer' }
+              }),
+              React.createElement('div', { style: { fontFamily: FONT_MONO, fontSize: '10px', color: 'var(--muted)' } }, `Columna guía vertical (${centerGuideCol})`),
+              React.createElement('input', {
+                type: 'range',
+                min: 0,
+                max: Math.max(0, gridSize - 1),
+                value: centerGuideCol,
+                onChange: e => setCenterGuideCol(Number(e.target.value)),
+                style: { width: '100%', accentColor: ACCENT, cursor: 'pointer' }
+              })
+            ),
+            guidePreview
+          ),
+          menu === 'view' && React.createElement(React.Fragment, null,
+            React.createElement('p', {
+              style: { margin: 0, fontFamily: FONT_MONO, fontSize: '10px', color: 'var(--muted)', lineHeight: '1.6' }
+            }, 'Ajustes visuales del editor para caracteres especiales.'),
+            toggleCard(
+              'Marcador del carácter espacio',
+              'Activa una referencia visual para editar el espacio sin confundirlo con celdas vacías.',
+              showSpaceMarker,
+              setShowSpaceMarker
+            )
           )
         )
       ),
       React.createElement(Btn, { onClick: onClose, style: { alignSelf: 'flex-end' } }, 'Listo')
     )
   );
+};
 
 // ── Guide overlay SVG ─────────────────────────
 // Guías estilo foto de referencia: líneas rojas en posiciones de filas/columnas clave
-const GuideOverlay = ({ gridSize }) => {
+const GuideOverlay = ({
+  gridSize,
+  capGuideRow,
+  xHeightGuideRow,
+  baselineGuideRow,
+  descGuideRow,
+  centerGuideCol,
+  showCenterGuide
+}) => {
   const lines = [];
 
-  const capRow       = 1;
-  const xHeightRow   = Math.round(gridSize * 0.33);
-  const baselineRow  = getBaselineRow(gridSize);
-  const descenderRow = gridSize - 1;
+  const defaults = defaultGuideRows(gridSize);
+  const capRow       = Math.min(gridSize - 1, Math.max(0, capGuideRow ?? defaults.cap));
+  const xHeightRow   = Math.min(gridSize - 1, Math.max(0, xHeightGuideRow ?? defaults.xHeight));
+  const baselineRow  = Math.min(gridSize - 1, Math.max(0, baselineGuideRow ?? defaults.baseline));
+  const descenderRow = Math.min(gridSize - 1, Math.max(0, descGuideRow ?? defaults.descender));
 
   const rowPct = (row) => (row / gridSize * 100).toFixed(4);
 
@@ -448,13 +693,15 @@ const GuideOverlay = ({ gridSize }) => {
   );
 
   // Línea vertical roja (a 2 columnas del borde, como la foto)
-  const col2pct = (2 / gridSize * 100).toFixed(4);
-  lines.push(
-    React.createElement('line', {
-      key: 'vl', x1: `${col2pct}%`, y1: '0', x2: `${col2pct}%`, y2: '100%',
-      stroke: 'rgba(191,69,69,0.70)', strokeWidth: '1.5'
-    })
-  );
+  if (showCenterGuide) {
+    const centerColPct = (centerGuideCol / gridSize * 100).toFixed(4);
+    lines.push(
+      React.createElement('line', {
+        key: 'vl', x1: `${centerColPct}%`, y1: '0', x2: `${centerColPct}%`, y2: '100%',
+        stroke: 'rgba(191,69,69,0.70)', strokeWidth: '1.5'
+      })
+    );
+  }
 
   // Helper: línea horizontal nombrada
   const guide = (key, row, label, opacity, strokeW, dash) => {
@@ -518,7 +765,14 @@ export function EditorPage({
   const [openUserMenu,    setOpenUserMenu]    = useState(false);
   const [avatarColor,     setAvatarColor]     = useState(ACCENT);
   const [showGuides,      setShowGuides]      = useState(true);
-  const [showSpaceMarker, setShowSpaceMarker] = useState(() => localStorage.getItem('cs-show-space-marker') !== '0');
+  const defaults = defaultGuideRows(gridSize);
+  const [showSpaceMarker, setShowSpaceMarker] = useState(() => readBoolSetting(EDITOR_STORAGE_KEYS.showSpaceMarker, true));
+  const [showCenterGuide, setShowCenterGuide] = useState(() => readBoolSetting(EDITOR_STORAGE_KEYS.showCenterGuide, true));
+  const [centerGuideCol,  setCenterGuideCol]  = useState(() => readNumberSetting(EDITOR_STORAGE_KEYS.centerGuideCol, 2));
+  const [capGuideRow,     setCapGuideRow]     = useState(() => readNumberSetting(EDITOR_STORAGE_KEYS.capGuideRow, defaults.cap));
+  const [xHeightGuideRow, setXHeightGuideRow] = useState(() => readNumberSetting(EDITOR_STORAGE_KEYS.xHeightGuideRow, defaults.xHeight));
+  const [baselineGuideRow,setBaselineGuideRow]= useState(() => readNumberSetting(EDITOR_STORAGE_KEYS.baselineGuideRow, defaults.baseline));
+  const [descGuideRow,    setDescGuideRow]    = useState(() => readNumberSetting(EDITOR_STORAGE_KEYS.descGuideRow, defaults.descender));
 
   const avatarInit = (user?.displayName || user?.email || '?')[0].toUpperCase();
 
@@ -540,8 +794,36 @@ export function EditorPage({
   }, [openFileMenu, openUserMenu]);
 
   useEffect(() => {
-    localStorage.setItem('cs-show-space-marker', showSpaceMarker ? '1' : '0');
+    writeSetting(EDITOR_STORAGE_KEYS.showSpaceMarker, showSpaceMarker ? '1' : '0');
   }, [showSpaceMarker]);
+  useEffect(() => {
+    writeSetting(EDITOR_STORAGE_KEYS.showCenterGuide, showCenterGuide ? '1' : '0');
+  }, [showCenterGuide]);
+  useEffect(() => {
+    const clamped = Math.max(0, Math.min(gridSize - 1, centerGuideCol || 0));
+    if (clamped !== centerGuideCol) setCenterGuideCol(clamped);
+    writeSetting(EDITOR_STORAGE_KEYS.centerGuideCol, clamped);
+  }, [centerGuideCol, gridSize]);
+  useEffect(() => {
+    const clamped = Math.max(0, Math.min(gridSize - 1, xHeightGuideRow || 0));
+    if (clamped !== xHeightGuideRow) setXHeightGuideRow(clamped);
+    writeSetting(EDITOR_STORAGE_KEYS.xHeightGuideRow, clamped);
+  }, [xHeightGuideRow, gridSize]);
+  useEffect(() => {
+    const clamped = Math.max(0, Math.min(gridSize - 1, capGuideRow || 0));
+    if (clamped !== capGuideRow) setCapGuideRow(clamped);
+    writeSetting(EDITOR_STORAGE_KEYS.capGuideRow, clamped);
+  }, [capGuideRow, gridSize]);
+  useEffect(() => {
+    const clamped = Math.max(0, Math.min(gridSize - 1, baselineGuideRow || 0));
+    if (clamped !== baselineGuideRow) setBaselineGuideRow(clamped);
+    writeSetting(EDITOR_STORAGE_KEYS.baselineGuideRow, clamped);
+  }, [baselineGuideRow, gridSize]);
+  useEffect(() => {
+    const clamped = Math.max(0, Math.min(gridSize - 1, descGuideRow || 0));
+    if (clamped !== descGuideRow) setDescGuideRow(clamped);
+    writeSetting(EDITOR_STORAGE_KEYS.descGuideRow, clamped);
+  }, [descGuideRow, gridSize]);
 
   const modeTools = [
     { id: 'pencil',   iconName: 'pencil',   label: 'LIBRE'   },
@@ -912,7 +1194,15 @@ export function EditorPage({
               }
             })
           ),
-          React.createElement(GuideOverlay, { gridSize })
+          React.createElement(GuideOverlay, {
+            gridSize,
+            capGuideRow,
+            xHeightGuideRow,
+            baselineGuideRow,
+            descGuideRow,
+            centerGuideCol,
+            showCenterGuide
+          })
         ),
 
         // preview moved to left sidebar below
@@ -1028,7 +1318,20 @@ export function EditorPage({
     showPrefs && React.createElement(PreferencesModal, {
       onClose: () => setShowPrefs(false),
       showSpaceMarker,
-      setShowSpaceMarker
+      setShowSpaceMarker,
+      showCenterGuide,
+      setShowCenterGuide,
+      centerGuideCol,
+      setCenterGuideCol,
+      capGuideRow,
+      setCapGuideRow,
+      xHeightGuideRow,
+      setXHeightGuideRow,
+      baselineGuideRow,
+      setBaselineGuideRow,
+      descGuideRow,
+      setDescGuideRow,
+      gridSize
     })
   );
 }

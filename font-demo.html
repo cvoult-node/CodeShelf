@@ -50,8 +50,8 @@
 
     .preview-section { background: var(--canvas-bg); border-radius: 10px; padding: 20px; margin-bottom: 20px; }
     .preview-label { font-size: 9px; color: var(--muted); letter-spacing: 3px; margin-bottom: 12px; }
-    .preview-canvas-wrap { min-height: 80px; display: flex; align-items: center; overflow-x: auto; overflow-y: hidden; margin-bottom: 16px; }
-    #preview-canvas { image-rendering: pixelated; }
+    .preview-canvas-wrap { min-height: 80px; display: flex; align-items: center; overflow-x: auto; overflow-y: hidden; margin-bottom: 16px; white-space: nowrap; }
+    #preview-canvas { image-rendering: pixelated; display: block; flex-shrink: 0; }
     .preview-controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
     .preview-input {
       flex: 1; min-width: 160px; background: var(--surface2); border: 1px solid var(--border);
@@ -100,7 +100,7 @@
       padding: 24px; margin-bottom: 24px; box-shadow: var(--shadow-card);
     }
     .pangram-canvas-wrap { background: var(--canvas-bg); border-radius: 8px; padding: 16px; overflow-x: auto; margin-top: 16px; }
-    #pangram-canvas { image-rendering: pixelated; }
+    #pangram-canvas { image-rendering: pixelated; display: block; flex-shrink: 0; }
   </style>
 </head>
 <body>
@@ -214,7 +214,7 @@
   <script type="module">
     import { auth, db, onAuthStateChanged, signOut } from './src/firebase.js';
     import { doc, getDoc } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
-    import { renderTextOnCanvas, createGlyphGrid, countGlyphs, measureText } from './src/pixelRenderer.js';
+    import { renderTextOnCanvas, createGlyphGrid, countGlyphs, measureTextByGlyphs } from './src/pixelRenderer.js';
 
     const hide = id => document.getElementById(id).classList.add('hidden');
     const show = id => document.getElementById(id).classList.remove('hidden');
@@ -263,28 +263,25 @@
       if (!post) return;
       const text = document.getElementById('preview-text').value || ' ';
       const canvas = document.getElementById('preview-canvas');
-      const gs = post.gridSize || 8, ls = 2, padX = 16, padY = 12;
-      canvas.width  = Math.max(measureText(text.toUpperCase(), gs, pixelSize, ls) + padX * 2, 10);
+      const gs = post.gridSize || 8, ls = 2, padX = 16, padY = 12, ws = 3;
+      canvas.width  = Math.max(measureTextByGlyphs(text.toUpperCase(), post.font || {}, gs, pixelSize, ls, ws) + padX * 2, 10);
       canvas.height = Math.max(gs * pixelSize + padY * 2, 10);
       const ctx = canvas.getContext('2d');
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      renderTextOnCanvas(ctx, text, post.font || {}, gs, pixelSize, padX, padY, fontColor, ls);
+      renderTextOnCanvas(ctx, text, post.font || {}, gs, pixelSize, padX, padY, fontColor, ls, ws);
     }
 
     function drawPangram() {
       if (!post) return;
       const text = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ 0123456789';
-      const gs = post.gridSize || 8, ps = 3, ls = 2, chars = 13;
-      const lineH = gs * ps + 8;
-      const lines = [];
-      for (let i = 0; i < text.length; i += chars) lines.push(text.slice(i, i + chars));
-      const w = measureText(text.slice(0, chars), gs, ps, ls) + 32;
-      const h = lines.length * lineH + 24;
+      const gs = post.gridSize || 8, ps = 3, ls = 2, ws = 3;
+      const w = measureTextByGlyphs(text, post.font || {}, gs, ps, ls, ws) + 32;
+      const h = gs * ps + 24;
       const canvas = document.getElementById('pangram-canvas');
       canvas.width = w; canvas.height = h;
       const ctx = canvas.getContext('2d');
       ctx.clearRect(0, 0, w, h);
-      lines.forEach((line, i) => renderTextOnCanvas(ctx, line, post.font || {}, gs, ps, 16, 12 + i * lineH, fontColor, ls));
+      renderTextOnCanvas(ctx, text, post.font || {}, gs, ps, 16, 12, fontColor, ls, ws);
     }
 
     function renderGlyphs() {
