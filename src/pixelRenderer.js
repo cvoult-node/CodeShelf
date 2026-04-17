@@ -179,3 +179,5 @@ export function getAvailableChars(font) {
 export function countGlyphs(font) {
   return getAvailableChars(font).length;
 }
+
+export const availableChars = getAvailableChars;
