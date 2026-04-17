@@ -169,6 +169,29 @@ export function debugDrawBounds(ctx, x, y, width, height) {
   ctx.strokeRect(x, y, width, height);
 }
 
+export function createGlyphGrid(glyph, gridSize, pixelSize = 3, color = '#e62222') {
+  const wrap = document.createElement('div');
+
+  wrap.style.display = 'grid';
+  wrap.style.gridTemplateColumns = `repeat(${gridSize}, ${pixelSize}px)`;
+  wrap.style.gap = '0px';
+
+  const total = gridSize * gridSize;
+
+  for (let i = 0; i < total; i++) {
+    const px = document.createElement('div');
+
+    px.style.width = `${pixelSize}px`;
+    px.style.height = `${pixelSize}px`;
+    px.style.background =
+      (glyph && glyph[i]) ? color : 'rgba(255,255,255,0.04)';
+
+    wrap.appendChild(px);
+  }
+
+  return wrap;
+}
+
 // ─────────────────────────────────────────────
 // UTILIDADES
 // ─────────────────────────────────────────────
