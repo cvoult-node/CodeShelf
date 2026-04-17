@@ -9,7 +9,6 @@ export const EDITOR_STORAGE_KEYS = {
   centerGuideCol: 'cs-center-guide-col',
   capGuideRow: 'cs-cap-guide-row',
   xHeightGuideRow: 'cs-xheight-guide-row',
-  baselineGuideRow: 'cs-baseline-guide-row',
   descGuideRow: 'cs-desc-guide-row',
 };
 
@@ -35,7 +34,6 @@ export const writeSetting = (key, value) => {
 export const defaultGuideRows = (gridSize) => ({
   cap: 1,
   xHeight: Math.round(gridSize * 0.33),
-  baseline: Math.round(gridSize * 0.75),
   descender: gridSize - 1,
 });
 
@@ -44,7 +42,6 @@ export const clampGuideRows = (rows, gridSize) => {
   return {
     cap: clamp(rows.cap, 0, max),
     xHeight: clamp(rows.xHeight, 0, max),
-    baseline: clamp(rows.baseline, 0, max),
     descender: clamp(rows.descender, 0, max),
   };
 };
