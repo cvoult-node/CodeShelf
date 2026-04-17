@@ -590,6 +590,36 @@ const PreferencesModal = ({
           )
         )
       ),
+      React.createElement('div', {
+        style: {
+          background: 'var(--surface2)',
+          border: '1px solid var(--border)',
+          borderRadius: R_BTN,
+          padding: '10px 12px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '10px'
+        }
+      },
+        React.createElement('div', { style: { fontFamily: FONT_MONO, fontSize: '10px', color: 'var(--muted)' } }, `Fila X-Height (${xHeightGuideRow})`),
+        React.createElement('input', {
+          type: 'range',
+          min: 0,
+          max: Math.max(0, gridSize - 1),
+          value: xHeightGuideRow,
+          onChange: e => setXHeightGuideRow(Number(e.target.value)),
+          style: { width: '100%', accentColor: ACCENT, cursor: 'pointer' }
+        }),
+        React.createElement('div', { style: { fontFamily: FONT_MONO, fontSize: '10px', color: 'var(--muted)' } }, `Columna guía vertical (${centerGuideCol})`),
+        React.createElement('input', {
+          type: 'range',
+          min: 0,
+          max: Math.max(0, gridSize - 1),
+          value: centerGuideCol,
+          onChange: e => setCenterGuideCol(Number(e.target.value)),
+          style: { width: '100%', accentColor: ACCENT, cursor: 'pointer' }
+        })
+      ),
       React.createElement(Btn, { onClick: onClose, style: { alignSelf: 'flex-end' } }, 'Listo')
     )
   );
