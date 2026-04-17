@@ -19,18 +19,14 @@
 export function getGlyphBounds(glyph, gridSize) {
   if (!Array.isArray(glyph)) return null;
   let minCol = gridSize, maxCol = -1;
-  let minRow = gridSize, maxRow = -1;
   for (let i = 0; i < glyph.length; i++) {
     if (!glyph[i]) continue;
-    const row = Math.floor(i / gridSize);
     const col = i % gridSize;
     if (col < minCol) minCol = col;
     if (col > maxCol) maxCol = col;
-    if (row < minRow) minRow = row;
-    if (row > maxRow) maxRow = row;
   }
-  if (maxCol < 0 || maxRow < 0) return null;
-  return { minCol, maxCol, minRow, maxRow };
+  if (maxCol < 0) return null;
+  return { minCol, maxCol };
 }
 
 export function glyphAdvanceCols(char, glyph, gridSize, wordSpacingCols = 3) {
@@ -52,7 +48,7 @@ export function renderTextOnCanvas(ctx, text, font, gridSize, pixelSize, x, y, c
       continue;
     }
 
-    for (let row = bounds.minRow; row <= bounds.maxRow; row++) {
+    for (let row = 0; row < gridSize; row++) {
       for (let col = bounds.minCol; col <= bounds.maxCol; col++) {
         if (glyph[row * gridSize + col]) {
           ctx.fillStyle = color;

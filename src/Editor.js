@@ -23,16 +23,14 @@ const PixelPreview = ({
   const sz = Math.min(gridSize, 32);
   const getBounds = (glyph) => {
     if (!Array.isArray(glyph)) return null;
-    let minCol = sz, maxCol = -1, minRow = sz, maxRow = -1;
+    let minCol = sz, maxCol = -1;
     glyph.forEach((on, i) => {
       if (!on) return;
-      const row = Math.floor(i / sz), col = i % sz;
+      const col = i % sz;
       if (col < minCol) minCol = col;
       if (col > maxCol) maxCol = col;
-      if (row < minRow) minRow = row;
-      if (row > maxRow) maxRow = row;
     });
-    return (maxCol < 0 || maxRow < 0) ? null : { minCol, maxCol, minRow, maxRow };
+    return maxCol < 0 ? null : { minCol, maxCol };
   };
 
   return React.createElement('div', {
@@ -57,7 +55,7 @@ const PixelPreview = ({
       const minSpaceWidth = Math.max(pixelSize * 2, 1);
       const computedSpaceWidth = Math.max(minSpaceWidth, pixelSize * 3 + wordSpacing * 0.2);
       const glyphCols = bounds ? (bounds.maxCol - bounds.minCol + 1) : sz;
-      const glyphRows = bounds ? (bounds.maxRow - bounds.minRow + 1) : sz;
+      const glyphRows = sz;
 
       return React.createElement('div', {
         key: ci,
@@ -79,7 +77,7 @@ const PixelPreview = ({
         Array(glyphCols * glyphRows).fill(0).map((_, pi) => {
           const row = Math.floor(pi / glyphCols);
           const col = pi % glyphCols;
-          const sourceRow = bounds ? row + bounds.minRow : row;
+          const sourceRow = row;
           const sourceCol = bounds ? col + bounds.minCol : col;
           const sourceIdx = sourceRow * sz + sourceCol;
           return (
@@ -414,53 +412,181 @@ const PreferencesModal = ({
   centerGuideCol, setCenterGuideCol,
   xHeightGuideRow, setXHeightGuideRow,
   gridSize
-}) =>
-  React.createElement(Overlay, { onClose },
-    React.createElement(Modal, { style: { maxWidth: '460px', gap: '16px' } },
+}) => {
+  const [menu, setMenu] = useState('guides');
+  const previewSize = 16;
+
+  const menuButton = (id, label) => React.createElement('button', {
+    key: id,
+    onClick: () => setMenu(id),
+    style: {
+      width: '100%',
+      textAlign: 'left',
+      background: menu === id ? 'var(--accent3)' : 'transparent',
+      border: menu === id ? '1px solid var(--border-accent)' : '1px solid transparent',
+      borderRadius: R_BTN,
+      color: menu === id ? 'var(--text)' : 'var(--muted)',
+      fontFamily: FONT_MONO,
+      fontSize: '10px',
+      letterSpacing: '1px',
+      padding: '9px 10px',
+      cursor: 'pointer'
+    }
+  }, label);
+
+  const toggleCard = (title, desc, val, setVal) =>
+    React.createElement('button', {
+      onClick: () => setVal(v => !v),
+      style: {
+        width: '100%', textAlign: 'left',
+        background: val ? 'var(--accent3)' : 'var(--surface2)',
+        border: val ? '1px solid var(--border-accent)' : '1px solid var(--border)',
+        borderRadius: R_BTN, padding: '11px 12px', cursor: 'pointer'
+      }
+    },
+      React.createElement('div', {
+        style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }
+      },
+        React.createElement('span', { style: { fontFamily: FONT_MONO, fontSize: '11px', color: 'var(--text)' } }, title),
+        React.createElement('span', {
+          style: { fontFamily: FONT_MONO, fontSize: '10px', color: val ? ACCENT : 'var(--muted)' }
+        }, val ? 'ACTIVO' : 'INACTIVO')
+      ),
+      React.createElement('div', {
+        style: { fontFamily: FONT_MONO, fontSize: '9px', color: 'var(--muted2)', lineHeight: 1.5 }
+      }, desc)
+    );
+
+  const guidePreview = React.createElement('div', {
+    style: {
+      width: '180px', height: '180px', alignSelf: 'center',
+      position: 'relative', border: '1px solid var(--border)',
+      borderRadius: '10px', overflow: 'hidden',
+      background: 'var(--surface2)'
+    }
+  },
+    React.createElement('div', {
+      style: {
+        position: 'absolute', inset: 0,
+        display: 'grid',
+        gridTemplateColumns: `repeat(${previewSize}, 1fr)`,
+        gridTemplateRows: `repeat(${previewSize}, 1fr)`,
+        gap: '1px', background: 'var(--grid-line)'
+      }
+    },
+      Array(previewSize * previewSize).fill(0).map((_, i) =>
+        React.createElement('div', { key: i, style: { background: 'var(--empty)' } })
+      )
+    ),
+    React.createElement('div', {
+      style: {
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        top: `${(xHeightGuideRow / Math.max(1, gridSize)) * 100}%`,
+        height: '2px',
+        background: 'rgba(191,69,69,.65)'
+      }
+    }),
+    showCenterGuide && React.createElement('div', {
+      style: {
+        position: 'absolute',
+        top: 0,
+        bottom: 0,
+        left: `${(centerGuideCol / Math.max(1, gridSize)) * 100}%`,
+        width: '2px',
+        background: 'rgba(191,69,69,.8)'
+      }
+    })
+  );
+
+  return React.createElement(Overlay, { onClose },
+    React.createElement(Modal, { style: { maxWidth: '760px', width: '760px', gap: '16px' } },
       React.createElement('h3', {
         style: { margin: 0, fontFamily: FONT_PIXEL, fontSize: '10px', color: ACCENT, letterSpacing: '2px' }
       }, 'PREFERENCIAS DEL EDITOR'),
-      React.createElement('p', {
-        style: { margin: 0, fontFamily: FONT_MONO, fontSize: '10px', color: 'var(--muted)', lineHeight: '1.6' }
-      }, 'Ajusta la visualización del editor para dibujar con más precisión y menos ruido visual.'),
-      React.createElement('div', { style: { display: 'grid', gap: '10px' } },
-        [
-          {
-            id: 'space',
-            title: 'Marcador del carácter espacio',
-            desc: 'Activa una referencia visual para editar el espacio sin confundirlo con celdas vacías.',
-            val: showSpaceMarker,
-            setVal: setShowSpaceMarker
-          },
-          {
-            id: 'center-guide',
-            title: 'Guía vertical editable',
-            desc: 'Muestra/oculta la línea vertical y permite mover su columna desde esta pantalla.',
-            val: showCenterGuide,
-            setVal: setShowCenterGuide
+      React.createElement('div', {
+        style: { display: 'grid', gridTemplateColumns: '180px 1fr', gap: '14px', minHeight: '350px' }
+      },
+        React.createElement('aside', {
+          style: {
+            border: '1px solid var(--border)',
+            borderRadius: R_BTN,
+            background: 'var(--surface2)',
+            padding: '10px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '8px'
           }
-        ].map(item =>
-          React.createElement('button', {
-            key: item.id,
-            onClick: () => item.setVal(v => !v),
-            style: {
-              width: '100%', textAlign: 'left',
-              background: item.val ? 'var(--accent3)' : 'var(--surface2)',
-              border: item.val ? '1px solid var(--border-accent)' : '1px solid var(--border)',
-              borderRadius: R_BTN, padding: '11px 12px', cursor: 'pointer'
-            }
-          },
-            React.createElement('div', {
-              style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }
-            },
-              React.createElement('span', { style: { fontFamily: FONT_MONO, fontSize: '11px', color: 'var(--text)' } }, item.title),
-              React.createElement('span', {
-                style: { fontFamily: FONT_MONO, fontSize: '10px', color: item.val ? ACCENT : 'var(--muted)' }
-              }, item.val ? 'ACTIVO' : 'INACTIVO')
+        },
+          React.createElement('div', { style: { fontFamily: FONT_MONO, fontSize: '8px', color: 'var(--muted)', letterSpacing: '2px' } }, 'MENÚ'),
+          menuButton('guides', 'Guías'),
+          menuButton('view', 'Vista')
+        ),
+        React.createElement('section', {
+          style: {
+            border: '1px solid var(--border)',
+            borderRadius: R_BTN,
+            background: 'var(--surface)',
+            padding: '14px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '12px'
+          }
+        },
+          menu === 'guides' && React.createElement(React.Fragment, null,
+            React.createElement('p', {
+              style: { margin: 0, fontFamily: FONT_MONO, fontSize: '10px', color: 'var(--muted)', lineHeight: '1.6' }
+            }, 'Ajusta líneas guía y su posición. Usa la mini preview para ver dónde quedarán.'),
+            toggleCard(
+              'Guía vertical editable',
+              'Muestra/oculta la línea vertical y permite mover su columna.',
+              showCenterGuide,
+              setShowCenterGuide
             ),
             React.createElement('div', {
-              style: { fontFamily: FONT_MONO, fontSize: '9px', color: 'var(--muted2)', lineHeight: 1.5 }
-            }, item.desc)
+              style: {
+                background: 'var(--surface2)',
+                border: '1px solid var(--border)',
+                borderRadius: R_BTN,
+                padding: '10px 12px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '10px'
+              }
+            },
+              React.createElement('div', { style: { fontFamily: FONT_MONO, fontSize: '10px', color: 'var(--muted)' } }, `Fila X-Height (${xHeightGuideRow})`),
+              React.createElement('input', {
+                type: 'range',
+                min: 0,
+                max: Math.max(0, gridSize - 1),
+                value: xHeightGuideRow,
+                onChange: e => setXHeightGuideRow(Number(e.target.value)),
+                style: { width: '100%', accentColor: ACCENT, cursor: 'pointer' }
+              }),
+              React.createElement('div', { style: { fontFamily: FONT_MONO, fontSize: '10px', color: 'var(--muted)' } }, `Columna guía vertical (${centerGuideCol})`),
+              React.createElement('input', {
+                type: 'range',
+                min: 0,
+                max: Math.max(0, gridSize - 1),
+                value: centerGuideCol,
+                onChange: e => setCenterGuideCol(Number(e.target.value)),
+                style: { width: '100%', accentColor: ACCENT, cursor: 'pointer' }
+              })
+            ),
+            guidePreview
+          ),
+          menu === 'view' && React.createElement(React.Fragment, null,
+            React.createElement('p', {
+              style: { margin: 0, fontFamily: FONT_MONO, fontSize: '10px', color: 'var(--muted)', lineHeight: '1.6' }
+            }, 'Ajustes visuales del editor para caracteres especiales.'),
+            toggleCard(
+              'Marcador del carácter espacio',
+              'Activa una referencia visual para editar el espacio sin confundirlo con celdas vacías.',
+              showSpaceMarker,
+              setShowSpaceMarker
+            ),
+            guidePreview
           )
         )
       ),
@@ -497,6 +623,7 @@ const PreferencesModal = ({
       React.createElement(Btn, { onClick: onClose, style: { alignSelf: 'flex-end' } }, 'Listo')
     )
   );
+};
 
 // ── Guide overlay SVG ─────────────────────────
 // Guías estilo foto de referencia: líneas rojas en posiciones de filas/columnas clave

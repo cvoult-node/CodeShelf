@@ -135,7 +135,7 @@ export function buildAndDownload(fontData, gridSize, filename, format, meta = {}
     const minAdvance  = S;
 
     const advance = char === ' '
-      ? Math.max(minAdvance, Math.round(wordSpacing * 10))
+      ? Math.max(minAdvance, Math.round(wordSpacing * S))
       : Math.max(minAdvance, glyphWidth + pxSpacing);
 
     glyphs.push(new ot.Glyph({
