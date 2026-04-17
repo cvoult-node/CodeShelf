@@ -6,6 +6,13 @@ import { auth, signOut } from './firebase.js';
 import { ACCENT, TECLADO, R_CARD, R_BTN, FONT_MONO, FONT_PIXEL } from './constants.js';
 import { Btn, Icon, Overlay, Modal, Label } from './ui.js';
 import { buildAndDownload, getBaselineRow } from './canvas.js';
+import {
+  EDITOR_STORAGE_KEYS,
+  readBoolSetting,
+  readNumberSetting,
+  writeSetting,
+  defaultGuideRows
+} from './editorConfig.js';
 
 // ── Pixel preview helper ──────────────────────
 const PixelPreview = ({
@@ -745,7 +752,7 @@ export function EditorPage({
   }, [openFileMenu, openUserMenu]);
 
   useEffect(() => {
-    localStorage.setItem('cs-show-space-marker', showSpaceMarker ? '1' : '0');
+    writeSetting(EDITOR_STORAGE_KEYS.showSpaceMarker, showSpaceMarker ? '1' : '0');
   }, [showSpaceMarker]);
   useEffect(() => {
     localStorage.setItem('cs-show-center-guide', showCenterGuide ? '1' : '0');
