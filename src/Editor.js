@@ -1,7 +1,4 @@
-// ─────────────────────────────────────────────
-//  EDITOR — src/Editor.js
-// ─────────────────────────────────────────────
-import React, { useState, useRef, useCallback, useEffect } from 'https://esm.sh/react@18.2.0';
+import React, { useState, useRef, useCallback, useEffect, useMemo } from 'https://esm.sh/react@18.2.0';
 import { auth, signOut } from './firebase.js';
 import { ACCENT, TECLADO, R_CARD, R_BTN, FONT_MONO, FONT_PIXEL } from './constants.js';
 import { Btn, Icon, Overlay, Modal, Label } from './ui.js';
@@ -14,46 +11,24 @@ import {
   defaultGuideRows
 } from './editorConfig.js';
 
-// ── Pixel preview helper ──────────────────────
-const PixelPreview = ({
-  text,
-  fontData,
-  gridSize,
-  pixelSize = 3,
-  color = ACCENT,
-  showSpaceMarker = false,
-  letterSpacing = 0,
-  wordSpacing = 10,
-  extraSpace = 1
-}) => {
+const e = React.createElement;
+const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
+
+// ─────────────────────────────────────────────
+//  PIXEL PREVIEW
+// ─────────────────────────────────────────────
+const PixelPreview = ({ text, fontData, gridSize, pixelSize = 3, color = ACCENT, showSpaceMarker = false, letterSpacing = 0, wordSpacing = 10 }) => {
   const chars = text.split('');
   const sz = Math.min(gridSize, 32);
+
   const getBounds = (glyph) => {
     if (!Array.isArray(glyph)) return null;
     let minCol = sz, maxCol = -1;
-    glyph.forEach((on, i) => {
-      if (!on) return;
-      const col = i % sz;
-      if (col < minCol) minCol = col;
-      if (col > maxCol) maxCol = col;
-    });
+    glyph.forEach((on, i) => { if (!on) return; const col = i % sz; if (col < minCol) minCol = col; if (col > maxCol) maxCol = col; });
     return maxCol < 0 ? null : { minCol, maxCol };
   };
 
-  return React.createElement('div', {
-    style: {
-      display: 'flex',
-      gap: '0px',
-      flexWrap: 'nowrap',
-      overflowX: 'auto',
-      overflowY: 'hidden',
-      whiteSpace: 'nowrap',
-      padding: '8px',
-      minHeight: '28px',
-      alignItems: 'flex-end',
-      scrollbarWidth: 'thin'
-    }
-  },
+  return e('div', { style: { display: 'flex', flexWrap: 'nowrap', overflowX: 'auto', overflowY: 'hidden', whiteSpace: 'nowrap', padding: '8px', minHeight: '28px', alignItems: 'flex-end', scrollbarWidth: 'thin' } },
     chars.map((ch, ci) => {
       const glyph = fontData[ch];
       const bounds = getBounds(glyph);
@@ -64,661 +39,279 @@ const PixelPreview = ({
       const glyphCols = bounds ? (bounds.maxCol - bounds.minCol + 1) : sz;
       const glyphRows = sz;
 
-      return React.createElement('div', {
+      return e('div', {
         key: ci,
         style: {
-          display: 'grid',
-          gridTemplateColumns: `repeat(${glyphCols},${pixelSize}px)`,
-          gridTemplateRows: `repeat(${glyphRows},${pixelSize}px)`,
-          position: 'relative',
-          width: isSpace ? `${computedSpaceWidth}px` : undefined,
-          minWidth: isSpace ? `${minSpaceWidth}px` : undefined,
-          marginRight: `${spacingPx}px`,
-          border: (isSpace && showSpaceMarker) ? '1px dashed var(--border)' : 'none',
-          borderRadius: '4px',
-          padding: (isSpace && showSpaceMarker) ? '2px' : 0,
-          flexShrink: 0,
-          alignSelf: 'flex-end'
+          display: 'grid', gridTemplateColumns: `repeat(${glyphCols},${pixelSize}px)`, gridTemplateRows: `repeat(${glyphRows},${pixelSize}px)`,
+          position: 'relative', width: isSpace ? `${computedSpaceWidth}px` : undefined, minWidth: isSpace ? `${minSpaceWidth}px` : undefined,
+          marginRight: `${spacingPx}px`, border: (isSpace && showSpaceMarker) ? '1px dashed var(--border)' : 'none',
+          borderRadius: '4px', padding: (isSpace && showSpaceMarker) ? '2px' : 0, flexShrink: 0, alignSelf: 'flex-end'
         }
       },
         Array(glyphCols * glyphRows).fill(0).map((_, pi) => {
-          const row = Math.floor(pi / glyphCols);
-          const col = pi % glyphCols;
-          const sourceRow = row;
+          const row = Math.floor(pi / glyphCols); const col = pi % glyphCols;
           const sourceCol = bounds ? col + bounds.minCol : col;
-          const sourceIdx = sourceRow * sz + sourceCol;
-          return (
-          React.createElement('div', {
-            key: pi,
-            style: {
-              width: `${pixelSize}px`,
-              height: `${pixelSize}px`,
-              background: glyph?.[sourceIdx] ? color : 'transparent'
-            }
-          })
-        )}),
-        (isSpace && showSpaceMarker) && React.createElement('div', {
-          style: {
-            position: 'absolute', top: '2px', bottom: '2px', left: '50%',
-            width: '1px', transform: 'translateX(-50%)',
-            background: 'var(--border-accent)', opacity: .65, pointerEvents: 'none'
-          }
-        })
+          const sourceIdx = row * sz + sourceCol;
+          return e('div', { key: pi, style: { width: `${pixelSize}px`, height: `${pixelSize}px`, background: glyph?.[sourceIdx] ? color : 'transparent' } });
+        }),
+        (isSpace && showSpaceMarker) && e('div', { style: { position: 'absolute', top: '2px', bottom: '2px', left: '50%', width: '1px', transform: 'translateX(-50%)', background: 'var(--border-accent)', opacity: .65, pointerEvents: 'none' } })
       );
     })
   );
 };
 
-// ── Export modal ──────────────────────────────
-const ExportModal = ({ projectName, fontData, gridSize, previewText: externalPreviewText, onClose, onExport }) => {
-  const [filename,      setFilename]      = useState(projectName || 'mi-fuente');
-  const [fontName,      setFontName]      = useState(projectName || 'mi-fuente');
-  const [author,        setAuthor]        = useState('');
-  const [format,        setFormat]        = useState('otf');
-  const [letterSpacing, setLetterSpacing] = useState(1);
-  const [wordSpacing,   setWordSpacing]   = useState(10);
-  const [showAdvanced,  setShowAdvanced]  = useState(false);
-  const [unitsPerEm,    setUnitsPerEm]    = useState(1000);
-  // Para 12×12: baseline en fila 8 → ascender cubre 8 filas (8/12 * 1000 ≈ 667)
-  // Usamos 800 para dar espacio generoso sobre caps.
-  // Descender cubre 3 filas (3/12 * 1000 = 250) → -250
-  const [ascender,      setAscender]      = useState(800);
-  const [descender,     setDescender]     = useState(-250);
-
-  const PREVIEW_TEXT = externalPreviewText || 'Lorem ipsum dolor sit amet, consectetur adipiscing elit.';
-
-  const inputStyle = {
-    background: 'var(--surface2)', border: '1px solid var(--border)',
-    borderRadius: R_BTN, padding: '10px 13px', color: 'var(--text)',
-    fontSize: '13px', outline: 'none', fontFamily: FONT_MONO, width: '100%',
-    transition: 'border-color .15s'
-  };
-
-  const sliderStyle = { width: '100%', accentColor: ACCENT, cursor: 'pointer' };
-
-  const fieldGroup = (label, children) =>
-    React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: '6px' } },
-      React.createElement(Label, null, label),
-      children
-    );
-
-  return React.createElement(Overlay, { onClose },
-    React.createElement('div', {
-      style: {
-        background: 'var(--surface)', border: '1px solid var(--border2)',
-        borderRadius: R_CARD, padding: '24px', width: '520px', minWidth: '520px', maxWidth: '520px',
-        maxHeight: '90vh', overflowY: 'auto',
-        boxShadow: '0 32px 80px rgba(0,0,0,0.25)',
-        display: 'flex', flexDirection: 'column', gap: '20px'
-      }
-    },
-      React.createElement('h3', {
-        style: { fontFamily: FONT_PIXEL, fontSize: '10px', color: ACCENT, letterSpacing: '2px', margin: 0 }
-      }, 'EXPORTAR FUENTE'),
-
-      // Preview
-      React.createElement('div', {
-        style: {
-          background: 'var(--surface2)', border: '1px solid var(--border2)',
-          borderRadius: R_BTN, padding: '14px', minHeight: '96px'
-        }
-      },
-        React.createElement('div', {
-          style: { fontFamily: FONT_MONO, fontSize: '9px', color: 'var(--muted2)', letterSpacing: '2px', marginBottom: '10px' }
-        }, 'PREVIEW'),
-        React.createElement(PixelPreview, {
-          text: PREVIEW_TEXT, fontData, gridSize,
-          pixelSize: 4, color: ACCENT, showSpaceMarker: false,
-          letterSpacing, wordSpacing, extraSpace: 0
-        })
-      ),
-
-      fieldGroup('NOMBRE DEL ARCHIVO',
-        React.createElement('input', {
-          value: filename, onChange: e => setFilename(e.target.value), style: inputStyle,
-          onFocus: e => e.target.style.borderColor = ACCENT,
-          onBlur:  e => e.target.style.borderColor = 'var(--border)'
-        })
-      ),
-
-      fieldGroup('NOMBRE DE LA FUENTE (familia)',
-        React.createElement('input', {
-          value: fontName, onChange: e => setFontName(e.target.value), style: inputStyle,
-          onFocus: e => e.target.style.borderColor = ACCENT,
-          onBlur:  e => e.target.style.borderColor = 'var(--border)'
-        })
-      ),
-
-      fieldGroup('AUTOR',
-        React.createElement('input', {
-          value: author, placeholder: 'Tu nombre o seudónimo',
-          onChange: e => setAuthor(e.target.value), style: { ...inputStyle },
-          onFocus: e => e.target.style.borderColor = ACCENT,
-          onBlur:  e => e.target.style.borderColor = 'var(--border)'
-        })
-      ),
-
-
-      fieldGroup('LETTER SPACING (píxeles del canvas)',
-        React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: '6px' } },
-          React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' } },
-            React.createElement('span', { style: { fontFamily: FONT_MONO, fontSize: '10px', color: 'var(--muted)' } }, '1px canvas ≈ 10 unidades de métrica'),
-            React.createElement('span', { style: { fontFamily: FONT_MONO, fontSize: '12px', color: ACCENT, minWidth: '48px', textAlign: 'right' } }, letterSpacing + ' px')
-          ),
-          React.createElement('input', {
-            type: 'range', min: -5, max: 20, value: letterSpacing,
-            onChange: e => setLetterSpacing(Number(e.target.value)), style: sliderStyle
-          })
-        )
-      ),
-
-      fieldGroup('ESPACIADO DE PALABRAS (word spacing)',
-        React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: '6px' } },
-          React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' } },
-            React.createElement('span', { style: { fontFamily: FONT_MONO, fontSize: '10px', color: 'var(--muted)' } }, 'Ancho del espacio entre palabras'),
-            React.createElement('span', { style: { fontFamily: FONT_MONO, fontSize: '12px', color: ACCENT, minWidth: '32px', textAlign: 'right' } }, wordSpacing)
-          ),
-          React.createElement('input', {
-            type: 'range', min: -30, max: 80, value: wordSpacing,
-            onChange: e => setWordSpacing(Number(e.target.value)), style: sliderStyle
-          })
-        )
-      ),
-
-      // Opciones avanzadas
-      React.createElement('div', null,
-        React.createElement('button', {
-          onClick: () => setShowAdvanced(v => !v),
-          style: {
-            display: 'flex', alignItems: 'center', gap: '8px', background: 'none',
-            border: 'none', cursor: 'pointer', fontFamily: FONT_MONO,
-            fontSize: '9px', letterSpacing: '2px', color: 'var(--muted)', padding: '4px 0'
-          }
-        },
-          React.createElement('span', { style: { transition: 'transform .2s', transform: showAdvanced ? 'rotate(90deg)' : 'none' } }, '▶'),
-          'OPCIONES AVANZADAS'
-        ),
-        showAdvanced && React.createElement('div', {
-          style: {
-            marginTop: '14px', padding: '16px',
-            background: 'var(--surface2)', borderRadius: R_BTN,
-            border: '1px solid var(--border)',
-            display: 'flex', flexDirection: 'column', gap: '14px'
-          }
-        },
-          React.createElement('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' } },
-            ...[
-              ['UNITS PER EM', unitsPerEm, setUnitsPerEm, 500, 4000],
-              ['ASCENDENTE',   ascender,   setAscender,  -200, 2000],
-              ['DESCENDENTE',  descender,  setDescender, -800, 200]
-            ].map(([lbl, val, setter, min, max]) =>
-              React.createElement('div', { key: lbl, style: { display: 'flex', flexDirection: 'column', gap: '5px' } },
-                React.createElement('label', { style: { fontFamily: FONT_MONO, fontSize: '8px', color: 'var(--muted)', letterSpacing: '1px' } }, lbl),
-                React.createElement('input', {
-                  type: 'number', value: val, min, max,
-                  onChange: e => setter(Number(e.target.value)),
-                  style: { ...inputStyle, fontSize: '12px', padding: '8px 10px' },
-                  onFocus: e => e.target.style.borderColor = ACCENT,
-                  onBlur:  e => e.target.style.borderColor = 'var(--border)'
-                })
-              )
-            )
-          ),
-          React.createElement('p', {
-            style: { fontFamily: FONT_MONO, fontSize: '9px', color: 'var(--muted2)', lineHeight: '1.6', margin: 0 }
-          }, `Métrica vertical de la fuente. Para ${gridSize}×${gridSize}px: baseline en fila ${getBaselineRow(gridSize)}, ${gridSize - getBaselineRow(gridSize)} filas de descender. Ajusta solo si sabes lo que haces.`)
-        )
-      ),
-
-      // Formato
-      React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: '8px' } },
-        React.createElement(Label, null, 'FORMATO DE EXPORTACIÓN'),
-        React.createElement('div', { style: { display: 'flex', gap: '8px' } },
-          ['otf', 'ttf', 'woff'].map(f =>
-            React.createElement('button', {
-              key: f, onClick: () => setFormat(f),
-              style: {
-                flex: 1, padding: '10px', borderRadius: R_BTN, cursor: 'pointer',
-                fontFamily: FONT_MONO, fontWeight: '700', fontSize: '11px',
-                letterSpacing: '1px', textTransform: 'uppercase', transition: 'all .13s',
-                background: format === f ? ACCENT : 'var(--surface2)',
-                color: format === f ? '#fff' : 'var(--muted)',
-                border: format === f ? 'none' : '1px solid var(--border)'
-              }
-            }, f)
-          )
-        )
-      ),
-
-      // Botones
-      React.createElement('div', { style: { display: 'flex', gap: '10px', paddingTop: '4px' } },
-        React.createElement('button', {
-          onClick: onClose,
-          style: {
-            flex: 1, padding: '12px', background: 'var(--surface2)',
-            border: '1px solid var(--border)', borderRadius: R_BTN,
-            color: 'var(--muted)', fontSize: '11px', fontFamily: FONT_MONO, cursor: 'pointer'
-          }
-        }, 'CANCELAR'),
-        React.createElement('button', {
-          onClick: () => onExport(filename, format, {
-            fontName, author, letterSpacing, wordSpacing,
-            unitsPerEm, ascender, descender
-          }),
-          style: {
-            flex: 2, padding: '12px', background: ACCENT, borderRadius: R_BTN,
-            color: '#fff', fontWeight: '700', fontSize: '11px',
-            fontFamily: FONT_MONO, border: 'none', cursor: 'pointer',
-            transition: 'background .15s'
-          }
-        }, '⬇ EXPORTAR FUENTE')
-      )
-    )
+// ─────────────────────────────────────────────
+//  TOOLTIP
+// ─────────────────────────────────────────────
+const Tooltip = ({ label, children, placement = 'bottom' }) => {
+  const [visible, setVisible] = useState(false);
+  const pos = { bottom: { top: 'calc(100% + 8px)', left: '50%', transform: 'translateX(-50%)' }, top: { bottom: 'calc(100% + 8px)', left: '50%', transform: 'translateX(-50%)' }, right: { left: 'calc(100% + 8px)', top: '50%', transform: 'translateY(-50%)' }, left: { right: 'calc(100% + 8px)', top: '50%', transform: 'translateY(-50%)' } };
+  return e('div', { style: { position: 'relative', display: 'inline-flex' }, onMouseEnter: () => setVisible(true), onMouseLeave: () => setVisible(false) },
+    children,
+    visible && label && e('div', { style: { position: 'absolute', ...pos[placement], background: 'var(--surface3)', border: '1px solid var(--border)', borderRadius: '6px', padding: '5px 9px', whiteSpace: 'nowrap', fontFamily: FONT_MONO, fontSize: '9px', letterSpacing: '1px', color: 'var(--text)', zIndex: 999, pointerEvents: 'none', boxShadow: '0 4px 16px rgba(0,0,0,0.2)' } }, label)
   );
 };
 
-// ── Publish modal ─────────────────────────────
-const PublishModal = ({ projectName, fontData, gridSize, onClose, onPublish, isPublishing, published, showSpaceMarker }) => {
-  const [previewText, setPreviewText] = useState('HELLO WORLD');
-
-  if (published) {
-    return React.createElement(Overlay, { onClose },
-      React.createElement('div', {
-        style: {
-          background: 'var(--surface)', border: '1px solid var(--border2)',
-          borderRadius: R_CARD, padding: '36px 32px', width: '100%', maxWidth: '400px',
-          boxShadow: '0 32px 80px rgba(0,0,0,0.25)', textAlign: 'center',
-          display: 'flex', flexDirection: 'column', gap: '18px', alignItems: 'center'
-        }
-      },
-        React.createElement('div', { style: { fontSize: '32px' } }, '🎉'),
-        React.createElement('h3', { style: { fontFamily: FONT_PIXEL, fontSize: '10px', color: ACCENT, letterSpacing: '2px', margin: 0 } }, '¡PUBLICADO!'),
-        React.createElement('p', { style: { fontFamily: FONT_MONO, fontSize: '11px', color: 'var(--muted)', lineHeight: '1.7', margin: 0 } },
-          `"${projectName}" ya está visible en la galería pública de CodeShelf.`
-        ),
-        React.createElement('button', {
-          onClick: onClose,
-          style: {
-            padding: '12px 28px', background: ACCENT, border: 'none', borderRadius: R_BTN,
-            color: '#fff', fontFamily: FONT_MONO, fontWeight: '700', fontSize: '11px',
-            letterSpacing: '2px', cursor: 'pointer'
-          }
-        }, 'CERRAR')
-      )
-    );
-  }
-
-  return React.createElement(Overlay, { onClose },
-    React.createElement('div', {
-      style: {
-        background: 'var(--surface)', border: '1px solid var(--border2)',
-        borderRadius: R_CARD, padding: '28px', width: '100%', maxWidth: '440px',
-        boxShadow: '0 32px 80px rgba(0,0,0,0.25)',
-        display: 'flex', flexDirection: 'column', gap: '18px'
-      }
-    },
-      React.createElement('h3', {
-        style: { fontFamily: FONT_PIXEL, fontSize: '10px', color: ACCENT, letterSpacing: '2px', margin: 0 }
-      }, 'PUBLICAR FUENTE'),
-      React.createElement('p', {
-        style: { fontFamily: FONT_MONO, fontSize: '11px', color: 'var(--muted)', lineHeight: '1.7', margin: 0 }
-      }, `Esto publicará "${projectName}" en la galería pública para que otros usuarios puedan verla y descargarla.`),
-
-      React.createElement('div', {
-        style: {
-          background: 'var(--canvas-bg)', border: '1px solid var(--border)',
-          borderRadius: R_BTN, padding: '14px'
-        }
-      },
-        React.createElement('div', {
-          style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }
-        },
-          React.createElement('span', { style: { fontFamily: FONT_MONO, fontSize: '8px', color: 'var(--muted)', letterSpacing: '2px' } }, 'TEXTO DE PREVIEW'),
-          React.createElement('input', {
-            value: previewText,
-            onChange: e => setPreviewText(e.target.value),
-            style: {
-              background: 'none', border: 'none', outline: 'none',
-              color: 'var(--text)', fontSize: '11px', fontFamily: FONT_MONO,
-              textAlign: 'right', maxWidth: '160px'
-            }
-          })
-        ),
-        React.createElement(PixelPreview, { text: previewText, fontData, gridSize, pixelSize: 4, color: ACCENT, showSpaceMarker })
-      ),
-
-      React.createElement('div', { style: { display: 'flex', gap: '10px' } },
-        React.createElement('button', {
-          onClick: onClose,
-          style: {
-            flex: 1, padding: '12px', background: 'var(--surface2)',
-            border: '1px solid var(--border)', borderRadius: R_BTN,
-            color: 'var(--muted)', fontSize: '11px', fontFamily: FONT_MONO, cursor: 'pointer'
-          }
-        }, 'CANCELAR'),
-        React.createElement('button', {
-          onClick: () => onPublish(previewText),
-          disabled: isPublishing,
-          style: {
-            flex: 2, padding: '12px', background: ACCENT, borderRadius: R_BTN,
-            color: '#fff', fontWeight: '700', fontSize: '11px',
-            fontFamily: FONT_MONO, border: 'none', cursor: 'pointer',
-            opacity: isPublishing ? .6 : 1, transition: 'background .15s'
-          }
-        }, isPublishing ? 'PUBLICANDO...' : '🌐 PUBLICAR EN GALERÍA')
-      )
-    )
-  );
-};
-
-// ── Preferences modal ─────────────────────────
-const PreferencesModal = ({
-  onClose,
-  showSpaceMarker, setShowSpaceMarker,
-  showCenterGuide, setShowCenterGuide,
-  centerGuideCol, setCenterGuideCol,
-  xHeightGuideRow, setXHeightGuideRow,
-  gridSize
-}) => {
-  const [menu, setMenu] = useState('guides');
-  const previewSize = 16;
-
-  const menuButton = (id, label) => React.createElement('button', {
-    key: id,
-    onClick: () => setMenu(id),
-    style: {
-      width: '100%',
-      textAlign: 'left',
-      background: menu === id ? 'var(--accent3)' : 'transparent',
-      border: menu === id ? '1px solid var(--border-accent)' : '1px solid transparent',
-      borderRadius: R_BTN,
-      color: menu === id ? 'var(--text)' : 'var(--muted)',
-      fontFamily: FONT_MONO,
-      fontSize: '10px',
-      letterSpacing: '1px',
-      padding: '9px 10px',
-      cursor: 'pointer'
-    }
-  }, label);
-
-  const toggleCard = (title, desc, val, setVal) =>
-    React.createElement('button', {
-      onClick: () => setVal(v => !v),
-      style: {
-        width: '100%', textAlign: 'left',
-        background: val ? 'var(--accent3)' : 'var(--surface2)',
-        border: val ? '1px solid var(--border-accent)' : '1px solid var(--border)',
-        borderRadius: R_BTN, padding: '11px 12px', cursor: 'pointer'
-      }
-    },
-      React.createElement('div', {
-        style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }
-      },
-        React.createElement('span', { style: { fontFamily: FONT_MONO, fontSize: '11px', color: 'var(--text)' } }, title),
-        React.createElement('span', {
-          style: { fontFamily: FONT_MONO, fontSize: '10px', color: val ? ACCENT : 'var(--muted)' }
-        }, val ? 'ACTIVO' : 'INACTIVO')
-      ),
-      React.createElement('div', {
-        style: { fontFamily: FONT_MONO, fontSize: '9px', color: 'var(--muted2)', lineHeight: 1.5 }
-      }, desc)
-    );
-
-  const guidePreview = React.createElement('div', {
-    style: {
-      width: '180px', height: '180px', alignSelf: 'center',
-      position: 'relative', border: '1px solid var(--border)',
-      borderRadius: '10px', overflow: 'hidden',
-      background: 'var(--surface2)'
-    }
-  },
-    React.createElement('div', {
-      style: {
-        position: 'absolute', inset: 0,
-        display: 'grid',
-        gridTemplateColumns: `repeat(${previewSize}, 1fr)`,
-        gridTemplateRows: `repeat(${previewSize}, 1fr)`,
-        gap: '1px', background: 'var(--grid-line)'
-      }
-    },
-      Array(previewSize * previewSize).fill(0).map((_, i) =>
-        React.createElement('div', { key: i, style: { background: 'var(--empty)' } })
-      )
-    ),
-    React.createElement('div', {
-      style: {
-        position: 'absolute',
-        left: 0,
-        right: 0,
-        top: `${(xHeightGuideRow / Math.max(1, gridSize)) * 100}%`,
-        height: '2px',
-        background: 'rgba(191,69,69,.65)'
-      }
-    }),
-    showCenterGuide && React.createElement('div', {
-      style: {
-        position: 'absolute',
-        top: 0,
-        bottom: 0,
-        left: `${(centerGuideCol / Math.max(1, gridSize)) * 100}%`,
-        width: '2px',
-        background: 'rgba(191,69,69,.8)'
-      }
-    })
+// ─────────────────────────────────────────────
+//  ZOOM CONTROL
+// ─────────────────────────────────────────────
+const ZoomControl = ({ zoom, setZoom }) =>
+  e('div', { style: { display: 'flex', alignItems: 'center', gap: '2px', background: 'var(--surface2)', borderRadius: R_BTN, border: '1px solid var(--border)', padding: '2px' } },
+    e('button', { onClick: () => setZoom(z => Math.max(50, z - 25)), style: { width: '24px', height: '24px', borderRadius: '5px', border: 'none', background: 'none', color: 'var(--muted)', cursor: 'pointer', fontFamily: FONT_MONO, fontSize: '14px', lineHeight: 1 } }, '−'),
+    e('span', { style: { fontFamily: FONT_MONO, fontSize: '9px', color: 'var(--text)', minWidth: '34px', textAlign: 'center', letterSpacing: '1px' } }, `${zoom}%`),
+    e('button', { onClick: () => setZoom(z => Math.min(200, z + 25)), style: { width: '24px', height: '24px', borderRadius: '5px', border: 'none', background: 'none', color: 'var(--muted)', cursor: 'pointer', fontFamily: FONT_MONO, fontSize: '14px', lineHeight: 1 } }, '+')
   );
 
-  return React.createElement(Overlay, { onClose },
-    React.createElement(Modal, { style: { maxWidth: '760px', width: '760px', gap: '16px' } },
-      React.createElement('h3', {
-        style: { margin: 0, fontFamily: FONT_PIXEL, fontSize: '10px', color: ACCENT, letterSpacing: '2px' }
-      }, 'PREFERENCIAS DEL EDITOR'),
-      React.createElement('div', {
-        style: { display: 'grid', gridTemplateColumns: '180px 1fr', gap: '14px', minHeight: '350px' }
-      },
-        React.createElement('aside', {
-          style: {
-            border: '1px solid var(--border)',
-            borderRadius: R_BTN,
-            background: 'var(--surface2)',
-            padding: '10px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '8px'
-          }
-        },
-          React.createElement('div', { style: { fontFamily: FONT_MONO, fontSize: '8px', color: 'var(--muted)', letterSpacing: '2px' } }, 'MENÚ'),
-          menuButton('guides', 'Guías'),
-          menuButton('view', 'Vista')
-        ),
-        React.createElement('section', {
-          style: {
-            border: '1px solid var(--border)',
-            borderRadius: R_BTN,
-            background: 'var(--surface)',
-            padding: '14px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '12px'
-          }
-        },
-          menu === 'guides' && React.createElement(React.Fragment, null,
-            React.createElement('p', {
-              style: { margin: 0, fontFamily: FONT_MONO, fontSize: '10px', color: 'var(--muted)', lineHeight: '1.6' }
-            }, 'Ajusta líneas guía y su posición. Usa la mini preview para ver dónde quedarán.'),
-            toggleCard(
-              'Guía vertical editable',
-              'Muestra/oculta la línea vertical y permite mover su columna.',
-              showCenterGuide,
-              setShowCenterGuide
-            ),
-            React.createElement('div', {
-              style: {
-                background: 'var(--surface2)',
-                border: '1px solid var(--border)',
-                borderRadius: R_BTN,
-                padding: '10px 12px',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '10px'
-              }
-            },
-              React.createElement('div', { style: { fontFamily: FONT_MONO, fontSize: '10px', color: 'var(--muted)' } }, `Fila X-Height (${xHeightGuideRow})`),
-              React.createElement('input', {
-                type: 'range',
-                min: 0,
-                max: Math.max(0, gridSize - 1),
-                value: xHeightGuideRow,
-                onChange: e => setXHeightGuideRow(Number(e.target.value)),
-                style: { width: '100%', accentColor: ACCENT, cursor: 'pointer' }
-              }),
-              React.createElement('div', { style: { fontFamily: FONT_MONO, fontSize: '10px', color: 'var(--muted)' } }, `Columna guía vertical (${centerGuideCol})`),
-              React.createElement('input', {
-                type: 'range',
-                min: 0,
-                max: Math.max(0, gridSize - 1),
-                value: centerGuideCol,
-                onChange: e => setCenterGuideCol(Number(e.target.value)),
-                style: { width: '100%', accentColor: ACCENT, cursor: 'pointer' }
-              })
-            ),
-            guidePreview
-          ),
-          menu === 'view' && React.createElement(React.Fragment, null,
-            React.createElement('p', {
-              style: { margin: 0, fontFamily: FONT_MONO, fontSize: '10px', color: 'var(--muted)', lineHeight: '1.6' }
-            }, 'Ajustes visuales del editor para caracteres especiales.'),
-            toggleCard(
-              'Marcador del carácter espacio',
-              'Activa una referencia visual para editar el espacio sin confundirlo con celdas vacías.',
-              showSpaceMarker,
-              setShowSpaceMarker
-            ),
-            guidePreview
-          )
-        )
-      ),
-      React.createElement('div', {
-        style: {
-          background: 'var(--surface2)',
-          border: '1px solid var(--border)',
-          borderRadius: R_BTN,
-          padding: '10px 12px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '10px'
-        }
-      },
-        React.createElement('div', { style: { fontFamily: FONT_MONO, fontSize: '10px', color: 'var(--muted)' } }, `Fila X-Height (${xHeightGuideRow})`),
-        React.createElement('input', {
-          type: 'range',
-          min: 0,
-          max: Math.max(0, gridSize - 1),
-          value: xHeightGuideRow,
-          onChange: e => setXHeightGuideRow(Number(e.target.value)),
-          style: { width: '100%', accentColor: ACCENT, cursor: 'pointer' }
-        }),
-        React.createElement('div', { style: { fontFamily: FONT_MONO, fontSize: '10px', color: 'var(--muted)' } }, `Columna guía vertical (${centerGuideCol})`),
-        React.createElement('input', {
-          type: 'range',
-          min: 0,
-          max: Math.max(0, gridSize - 1),
-          value: centerGuideCol,
-          onChange: e => setCenterGuideCol(Number(e.target.value)),
-          style: { width: '100%', accentColor: ACCENT, cursor: 'pointer' }
-        })
-      ),
-      React.createElement(Btn, { onClick: onClose, style: { alignSelf: 'flex-end' } }, 'Listo')
-    )
-  );
-};
-
-// ── Guide overlay SVG ─────────────────────────
-// Guías estilo foto de referencia: líneas rojas en posiciones de filas/columnas clave
+// ─────────────────────────────────────────────
+//  GUIDE OVERLAY
+// ─────────────────────────────────────────────
 const GuideOverlay = ({ gridSize, xHeightGuideRow, centerGuideCol, showCenterGuide }) => {
   const lines = [];
-
-  const capRow       = 1;
-  const xHeightRow   = Math.min(gridSize - 1, Math.max(0, xHeightGuideRow ?? Math.round(gridSize * 0.33)));
-  const baselineRow  = getBaselineRow(gridSize);
-  const descenderRow = gridSize - 1;
-
+  const xHeightRow = clamp(xHeightGuideRow ?? Math.round(gridSize * 0.33), 0, gridSize - 1);
+  const baselineRow = getBaselineRow(gridSize);
   const rowPct = (row) => (row / gridSize * 100).toFixed(4);
 
-  // Zona de descender sombreada
-  lines.push(
-    React.createElement('rect', {
-      key: 'desc-zone',
-      x: '0', y: `${rowPct(baselineRow)}%`, width: '100%',
-      height: `${(100 - Number(rowPct(baselineRow))).toFixed(4)}%`,
-      fill: 'rgba(191,69,69,0.04)'
-    })
-  );
+  lines.push(e('rect', { key: 'desc-zone', x: '0', y: `${rowPct(baselineRow)}%`, width: '100%', height: `${(100 - Number(rowPct(baselineRow))).toFixed(4)}%`, fill: 'rgba(191,69,69,0.04)' }));
 
-  // Línea vertical roja (a 2 columnas del borde, como la foto)
   if (showCenterGuide) {
-    const centerColPct = (centerGuideCol / gridSize * 100).toFixed(4);
-    lines.push(
-      React.createElement('line', {
-        key: 'vl', x1: `${centerColPct}%`, y1: '0', x2: `${centerColPct}%`, y2: '100%',
-        stroke: 'rgba(191,69,69,0.70)', strokeWidth: '1.5'
-      })
-    );
+    const colPct = (centerGuideCol / gridSize * 100).toFixed(4);
+    lines.push(e('line', { key: 'vl', x1: `${colPct}%`, y1: '0', x2: `${colPct}%`, y2: '100%', stroke: 'rgba(191,69,69,0.70)', strokeWidth: '1.5' }));
   }
 
-  // Helper: línea horizontal nombrada
   const guide = (key, row, label, opacity, strokeW, dash) => {
     const pct = rowPct(row);
     return [
-      React.createElement('line', {
-        key: `${key}-l`, x1: '0', y1: `${pct}%`, x2: '100%', y2: `${pct}%`,
-        stroke: `rgba(191,69,69,${opacity})`, strokeWidth: strokeW || '1.4',
-        ...(dash ? { strokeDasharray: dash } : {})
-      }),
-      React.createElement('text', {
-        key: `${key}-t`, x: '99%', y: `${Math.max(2.5, Number(pct) - 0.6)}%`,
-        fill: `rgba(191,69,69,${opacity * 0.8})`,
-        fontSize: '6', textAnchor: 'end', fontFamily: 'monospace', fontWeight: '600'
-      }, label)
+      e('line', { key: `${key}-l`, x1: '0', y1: `${pct}%`, x2: '100%', y2: `${pct}%`, stroke: `rgba(191,69,69,${opacity})`, strokeWidth: strokeW || '1.4', ...(dash ? { strokeDasharray: dash } : {}) }),
+      e('text', { key: `${key}-t`, x: '99%', y: `${Math.max(2.5, Number(pct) - 0.6)}%`, fill: `rgba(191,69,69,${opacity * 0.8})`, fontSize: '6', textAnchor: 'end', fontFamily: 'monospace', fontWeight: '600' }, label)
     ];
   };
 
-  lines.push(
-    ...guide('cap',  capRow,       'CAP',   0.45, '1.3'),
-    ...guide('xh',   xHeightRow,   'X-H',   0.40, '1.1', '3 3'),
-    ...guide('base', baselineRow,  'BASE',  0.90, '1.8'),
-    ...guide('desc', descenderRow, 'DESC',  0.35, '1.0', '2 2')
-  );
-
-  return React.createElement('svg', {
-    style: {
-      position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
-      pointerEvents: 'none', zIndex: 5
-    },
-    xmlns: 'http://www.w3.org/2000/svg'
-  }, ...lines);
+  lines.push(...guide('cap', 1, 'CAP', 0.45, '1.3'), ...guide('xh', xHeightRow, 'X-H', 0.40, '1.1', '3 3'), ...guide('base', baselineRow, 'BASE', 0.90, '1.8'), ...guide('desc', gridSize - 1, 'DESC', 0.35, '1.0', '2 2'));
+  return e('svg', { style: { position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 5 }, xmlns: 'http://www.w3.org/2000/svg' }, ...lines);
 };
 
-// ── Toolbar icon (auto-sized) ─────────────────
-const ToolIcon = ({ name, size = 16, active = false, style = {} }) =>
-  React.createElement('img', {
-    src: `./src/icons/${name}.svg`,
-    style: {
-      width: `${size}px`, height: `${size}px`, display: 'block',
-      filter: active ? 'invert(1)' : 'var(--icon-filter)',
-      opacity: active ? 1 : .65, flexShrink: 0, ...style
-    }
-  });
+// ─────────────────────────────────────────────
+//  EXPORT MODAL
+// ─────────────────────────────────────────────
+const ExportModal = ({ projectName, fontData, gridSize, previewText: extText, onClose, onExport }) => {
+  const [filename, setFilename] = useState(projectName || 'mi-fuente');
+  const [fontName, setFontName] = useState(projectName || 'mi-fuente');
+  const [author, setAuthor] = useState('');
+  const [format, setFormat] = useState('otf');
+  const [letterSpacing, setLetterSpacing] = useState(1);
+  const [wordSpacing, setWordSpacing] = useState(10);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [unitsPerEm, setUnitsPerEm] = useState(1000);
+  const [ascender, setAscender] = useState(800);
+  const [descender, setDescender] = useState(-250);
 
-// ── Editor page ───────────────────────────────
+  const inputStyle = { background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: R_BTN, padding: '10px 13px', color: 'var(--text)', fontSize: '13px', outline: 'none', fontFamily: FONT_MONO, width: '100%', transition: 'border-color .15s' };
+  const sliderStyle = { width: '100%', accentColor: ACCENT, cursor: 'pointer' };
+  const Field = ({ label, children }) => e('div', { style: { display: 'flex', flexDirection: 'column', gap: '6px' } }, e('label', { style: { fontFamily: FONT_MONO, fontSize: '8px', letterSpacing: '2px', color: 'var(--muted)' } }, label), children);
+
+  return e(Overlay, { onClose },
+    e('div', { style: { background: 'var(--surface)', border: '1px solid var(--border2)', borderRadius: R_CARD, padding: '28px', width: '540px', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 32px 80px rgba(0,0,0,0.3)', display: 'flex', flexDirection: 'column', gap: '18px' } },
+      e('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' } },
+        e('h3', { style: { fontFamily: FONT_PIXEL, fontSize: '10px', color: ACCENT, letterSpacing: '2px', margin: 0 } }, 'EXPORTAR FUENTE'),
+        e('button', { onClick: onClose, style: { background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', fontSize: '20px', lineHeight: 1, padding: '0 4px' } }, '×')
+      ),
+      e('div', { style: { background: 'var(--surface2)', border: '1px solid var(--border2)', borderRadius: R_BTN, padding: '14px', minHeight: '80px' } },
+        e('div', { style: { fontFamily: FONT_MONO, fontSize: '8px', color: 'var(--muted2)', letterSpacing: '2px', marginBottom: '10px' } }, 'PREVIEW'),
+        e(PixelPreview, { text: extText || 'Lorem ipsum', fontData, gridSize, pixelSize: 4, color: ACCENT, letterSpacing, wordSpacing })
+      ),
+      e(Field, { label: 'NOMBRE DEL ARCHIVO' }, e('input', { value: filename, onChange: ev => setFilename(ev.target.value), style: inputStyle, onFocus: ev => ev.target.style.borderColor = ACCENT, onBlur: ev => ev.target.style.borderColor = 'var(--border)' })),
+      e(Field, { label: 'NOMBRE DE LA FAMILIA' }, e('input', { value: fontName, onChange: ev => setFontName(ev.target.value), style: inputStyle, onFocus: ev => ev.target.style.borderColor = ACCENT, onBlur: ev => ev.target.style.borderColor = 'var(--border)' })),
+      e(Field, { label: 'AUTOR' }, e('input', { value: author, placeholder: 'Tu nombre o seudónimo', onChange: ev => setAuthor(ev.target.value), style: inputStyle, onFocus: ev => ev.target.style.borderColor = ACCENT, onBlur: ev => ev.target.style.borderColor = 'var(--border)' })),
+      e(Field, { label: 'LETTER SPACING (px canvas)' },
+        e('div', { style: { display: 'flex', flexDirection: 'column', gap: '6px' } },
+          e('div', { style: { display: 'flex', justifyContent: 'space-between' } }, e('span', { style: { fontFamily: FONT_MONO, fontSize: '9px', color: 'var(--muted2)' } }, '1px ≈ 10 unidades'), e('span', { style: { fontFamily: FONT_MONO, fontSize: '12px', color: ACCENT } }, `${letterSpacing} px`)),
+          e('input', { type: 'range', min: -5, max: 20, value: letterSpacing, onChange: ev => setLetterSpacing(Number(ev.target.value)), style: sliderStyle })
+        )
+      ),
+      e(Field, { label: 'WORD SPACING' },
+        e('div', { style: { display: 'flex', flexDirection: 'column', gap: '6px' } },
+          e('div', { style: { display: 'flex', justifyContent: 'space-between' } }, e('span', { style: { fontFamily: FONT_MONO, fontSize: '9px', color: 'var(--muted2)' } }, 'Ancho del espacio'), e('span', { style: { fontFamily: FONT_MONO, fontSize: '12px', color: ACCENT } }, wordSpacing)),
+          e('input', { type: 'range', min: -30, max: 80, value: wordSpacing, onChange: ev => setWordSpacing(Number(ev.target.value)), style: sliderStyle })
+        )
+      ),
+      e('div', null,
+        e('button', { onClick: () => setShowAdvanced(v => !v), style: { display: 'flex', alignItems: 'center', gap: '8px', background: 'none', border: 'none', cursor: 'pointer', fontFamily: FONT_MONO, fontSize: '9px', letterSpacing: '2px', color: 'var(--muted)', padding: '4px 0' } },
+          e('span', { style: { transition: 'transform .2s', transform: showAdvanced ? 'rotate(90deg)' : 'none', display: 'inline-block' } }, '▶'), 'OPCIONES AVANZADAS'
+        ),
+        showAdvanced && e('div', { style: { marginTop: '12px', padding: '16px', background: 'var(--surface2)', borderRadius: R_BTN, border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: '12px' } },
+          e('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' } },
+            [['UNITS PER EM', unitsPerEm, setUnitsPerEm, 500, 4000], ['ASCENDENTE', ascender, setAscender, -200, 2000], ['DESCENDENTE', descender, setDescender, -800, 200]].map(([lbl, val, setter, min, max]) =>
+              e('div', { key: lbl, style: { display: 'flex', flexDirection: 'column', gap: '5px' } },
+                e('label', { style: { fontFamily: FONT_MONO, fontSize: '8px', color: 'var(--muted)', letterSpacing: '1px' } }, lbl),
+                e('input', { type: 'number', value: val, min, max, onChange: ev => setter(Number(ev.target.value)), style: { ...inputStyle, fontSize: '12px', padding: '8px 10px' }, onFocus: ev => ev.target.style.borderColor = ACCENT, onBlur: ev => ev.target.style.borderColor = 'var(--border)' })
+              )
+            )
+          ),
+          e('p', { style: { fontFamily: FONT_MONO, fontSize: '9px', color: 'var(--muted2)', lineHeight: '1.6', margin: 0 } }, `Métrica para ${gridSize}×${gridSize}px. Baseline en fila ${getBaselineRow(gridSize)}.`)
+        )
+      ),
+      e('div', { style: { display: 'flex', flexDirection: 'column', gap: '8px' } },
+        e('label', { style: { fontFamily: FONT_MONO, fontSize: '8px', letterSpacing: '2px', color: 'var(--muted)' } }, 'FORMATO'),
+        e('div', { style: { display: 'flex', gap: '8px' } },
+          ['otf', 'ttf', 'woff'].map(f => e('button', { key: f, onClick: () => setFormat(f), style: { flex: 1, padding: '10px', borderRadius: R_BTN, cursor: 'pointer', fontFamily: FONT_MONO, fontWeight: '700', fontSize: '11px', letterSpacing: '1px', textTransform: 'uppercase', transition: 'all .13s', background: format === f ? ACCENT : 'var(--surface2)', color: format === f ? '#fff' : 'var(--muted)', border: format === f ? 'none' : '1px solid var(--border)' } }, f))
+        )
+      ),
+      e('div', { style: { display: 'flex', gap: '10px', paddingTop: '4px' } },
+        e('button', { onClick: onClose, style: { flex: 1, padding: '12px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: R_BTN, color: 'var(--muted)', fontSize: '11px', fontFamily: FONT_MONO, cursor: 'pointer' } }, 'CANCELAR'),
+        e('button', { onClick: () => onExport(filename, format, { fontName, author, letterSpacing, wordSpacing, unitsPerEm, ascender, descender }), style: { flex: 2, padding: '12px', background: ACCENT, borderRadius: R_BTN, color: '#fff', fontWeight: '700', fontSize: '11px', fontFamily: FONT_MONO, border: 'none', cursor: 'pointer' } }, '⬇ EXPORTAR FUENTE')
+      )
+    )
+  );
+};
+
+// ─────────────────────────────────────────────
+//  PUBLISH MODAL
+// ─────────────────────────────────────────────
+const PublishModal = ({ projectName, fontData, gridSize, onClose, onPublish, isPublishing, published, showSpaceMarker }) => {
+  const [previewText, setPreviewText] = useState('HELLO WORLD');
+
+  if (published) return e(Overlay, { onClose },
+    e('div', { style: { background: 'var(--surface)', border: '1px solid var(--border2)', borderRadius: R_CARD, padding: '40px 36px', maxWidth: '380px', boxShadow: '0 32px 80px rgba(0,0,0,0.3)', textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '16px', alignItems: 'center' } },
+      e('div', { style: { fontSize: '40px' } }, '🎉'),
+      e('h3', { style: { fontFamily: FONT_PIXEL, fontSize: '10px', color: ACCENT, letterSpacing: '2px', margin: 0 } }, '¡PUBLICADO!'),
+      e('p', { style: { fontFamily: FONT_MONO, fontSize: '11px', color: 'var(--muted)', lineHeight: '1.7', margin: 0 } }, `"${projectName}" ya está visible en la galería pública.`),
+      e('button', { onClick: onClose, style: { padding: '12px 28px', background: ACCENT, border: 'none', borderRadius: R_BTN, color: '#fff', fontFamily: FONT_MONO, fontWeight: '700', fontSize: '11px', letterSpacing: '2px', cursor: 'pointer' } }, 'CERRAR')
+    )
+  );
+
+  return e(Overlay, { onClose },
+    e('div', { style: { background: 'var(--surface)', border: '1px solid var(--border2)', borderRadius: R_CARD, padding: '28px', maxWidth: '440px', boxShadow: '0 32px 80px rgba(0,0,0,0.3)', display: 'flex', flexDirection: 'column', gap: '18px' } },
+      e('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' } },
+        e('h3', { style: { fontFamily: FONT_PIXEL, fontSize: '10px', color: ACCENT, letterSpacing: '2px', margin: 0 } }, 'PUBLICAR FUENTE'),
+        e('button', { onClick: onClose, style: { background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', fontSize: '20px', lineHeight: 1, padding: '0 4px' } }, '×')
+      ),
+      e('p', { style: { fontFamily: FONT_MONO, fontSize: '11px', color: 'var(--muted)', lineHeight: '1.7', margin: 0 } }, `Publicará "${projectName}" en la galería para que otros la vean y descarguen.`),
+      e('div', { style: { background: 'var(--canvas-bg)', border: '1px solid var(--border)', borderRadius: R_BTN, padding: '14px' } },
+        e('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' } },
+          e('span', { style: { fontFamily: FONT_MONO, fontSize: '8px', color: 'var(--muted)', letterSpacing: '2px' } }, 'TEXTO DE PREVIEW'),
+          e('input', { value: previewText, onChange: ev => setPreviewText(ev.target.value), style: { background: 'none', border: 'none', outline: 'none', color: 'var(--text)', fontSize: '11px', fontFamily: FONT_MONO, textAlign: 'right', maxWidth: '160px' } })
+        ),
+        e(PixelPreview, { text: previewText, fontData, gridSize, pixelSize: 4, color: ACCENT, showSpaceMarker })
+      ),
+      e('div', { style: { display: 'flex', gap: '10px' } },
+        e('button', { onClick: onClose, style: { flex: 1, padding: '12px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: R_BTN, color: 'var(--muted)', fontSize: '11px', fontFamily: FONT_MONO, cursor: 'pointer' } }, 'CANCELAR'),
+        e('button', { onClick: () => onPublish(previewText), disabled: isPublishing, style: { flex: 2, padding: '12px', background: ACCENT, borderRadius: R_BTN, color: '#fff', fontWeight: '700', fontSize: '11px', fontFamily: FONT_MONO, border: 'none', cursor: 'pointer', opacity: isPublishing ? .6 : 1 } }, isPublishing ? 'PUBLICANDO...' : '🌐 PUBLICAR EN GALERÍA')
+      )
+    )
+  );
+};
+
+// ─────────────────────────────────────────────
+//  PREFERENCES MODAL
+// ─────────────────────────────────────────────
+const PreferencesModal = ({ onClose, showSpaceMarker, setShowSpaceMarker, showCenterGuide, setShowCenterGuide, centerGuideCol, setCenterGuideCol, xHeightGuideRow, setXHeightGuideRow, gridSize }) => {
+  const [menu, setMenu] = useState('guides');
+
+  const MenuBtn = ({ id, label }) => e('button', { onClick: () => setMenu(id), style: { width: '100%', textAlign: 'left', padding: '9px 12px', background: menu === id ? `${ACCENT}12` : 'transparent', border: menu === id ? `1px solid ${ACCENT}30` : '1px solid transparent', borderRadius: R_BTN, color: menu === id ? 'var(--text)' : 'var(--muted)', fontFamily: FONT_MONO, fontSize: '10px', letterSpacing: '1px', cursor: 'pointer', transition: 'all .13s' } }, label);
+
+  const ToggleCard = ({ title, desc, val, setVal }) => e('button', { onClick: () => setVal(v => !v), style: { width: '100%', textAlign: 'left', background: val ? `${ACCENT}08` : 'var(--surface2)', border: val ? `1px solid ${ACCENT}30` : '1px solid var(--border)', borderRadius: R_BTN, padding: '12px 14px', cursor: 'pointer', transition: 'all .15s' } },
+    e('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '5px' } },
+      e('span', { style: { fontFamily: FONT_MONO, fontSize: '11px', color: 'var(--text)' } }, title),
+      e('span', { style: { fontFamily: FONT_MONO, fontSize: '9px', letterSpacing: '1px', color: val ? ACCENT : 'var(--muted2)', background: val ? `${ACCENT}10` : 'var(--surface3)', padding: '2px 7px', borderRadius: '4px', border: val ? `1px solid ${ACCENT}30` : '1px solid transparent' } }, val ? 'ON' : 'OFF')
+    ),
+    e('div', { style: { fontFamily: FONT_MONO, fontSize: '9px', color: 'var(--muted2)', lineHeight: 1.5 } }, desc)
+  );
+
+  const SliderInput = ({ label, value, onChange, min, max }) => e('div', { style: { display: 'flex', flexDirection: 'column', gap: '6px' } },
+    e('div', { style: { display: 'flex', justifyContent: 'space-between' } },
+      e('span', { style: { fontFamily: FONT_MONO, fontSize: '10px', color: 'var(--muted)' } }, label),
+      e('span', { style: { fontFamily: FONT_MONO, fontSize: '10px', color: ACCENT } }, value)
+    ),
+    e('input', { type: 'range', min, max, value, onChange, style: { width: '100%', accentColor: ACCENT, cursor: 'pointer' } })
+  );
+
+  const previewSize = 16;
+  const GuidePreview = () => e('div', { style: { width: '160px', height: '160px', alignSelf: 'center', position: 'relative', border: '1px solid var(--border)', borderRadius: '10px', overflow: 'hidden', background: 'var(--surface2)' } },
+    e('div', { style: { position: 'absolute', inset: 0, display: 'grid', gridTemplateColumns: `repeat(${previewSize}, 1fr)`, gridTemplateRows: `repeat(${previewSize}, 1fr)`, gap: '1px', background: 'var(--grid-line)' } }, Array(previewSize * previewSize).fill(0).map((_, i) => e('div', { key: i, style: { background: 'var(--empty)' } }))),
+    e('div', { style: { position: 'absolute', left: 0, right: 0, top: `${(xHeightGuideRow / Math.max(1, gridSize)) * 100}%`, height: '2px', background: 'rgba(191,69,69,.65)' } }),
+    showCenterGuide && e('div', { style: { position: 'absolute', top: 0, bottom: 0, left: `${(centerGuideCol / Math.max(1, gridSize)) * 100}%`, width: '2px', background: 'rgba(191,69,69,.8)' } })
+  );
+
+  const SHORTCUTS = [
+    ['P', 'Herramienta Lápiz'], ['F', 'Herramienta Relleno'], ['H', 'Espejo horizontal'], ['V', 'Espejo vertical'],
+    ['Ctrl+S', 'Guardar proyecto'], ['Ctrl+Z', 'Deshacer'], ['Ctrl+Y / Ctrl+Shift+Z', 'Rehacer'], ['Ctrl+I', 'Invertir glifo'],
+    ['← → ↑ ↓', 'Desplazar glifo'], ['Ctrl + +', 'Zoom +'], ['Ctrl + −', 'Zoom −'], ['Ctrl + 0', 'Reset zoom'],
+    ['Delete', 'Limpiar glifo'], ['Escape', 'Cerrar modal'],
+  ];
+
+  return e(Overlay, { onClose },
+    e(Modal, { style: { maxWidth: '700px', width: '700px', gap: '16px' } },
+      e('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' } },
+        e('h3', { style: { margin: 0, fontFamily: FONT_PIXEL, fontSize: '10px', color: ACCENT, letterSpacing: '2px' } }, 'PREFERENCIAS'),
+        e('button', { onClick: onClose, style: { background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', fontSize: '20px', lineHeight: 1, padding: '0 4px' } }, '×')
+      ),
+      e('div', { style: { display: 'grid', gridTemplateColumns: '160px 1fr', gap: '12px', minHeight: '320px' } },
+        e('aside', { style: { border: '1px solid var(--border)', borderRadius: R_BTN, background: 'var(--surface2)', padding: '8px', display: 'flex', flexDirection: 'column', gap: '4px' } },
+          e('div', { style: { fontFamily: FONT_MONO, fontSize: '8px', color: 'var(--muted2)', letterSpacing: '2px', padding: '4px 6px 8px' } }, 'SECCIÓN'),
+          e(MenuBtn, { id: 'guides', label: 'Guías' }),
+          e(MenuBtn, { id: 'view', label: 'Vista' }),
+          e(MenuBtn, { id: 'shortcuts', label: 'Atajos' })
+        ),
+        e('section', { style: { border: '1px solid var(--border)', borderRadius: R_BTN, background: 'var(--surface)', padding: '16px', display: 'flex', flexDirection: 'column', gap: '14px', overflowY: 'auto' } },
+          menu === 'guides' && e(React.Fragment, null,
+            e(ToggleCard, { title: 'Guía vertical editable', desc: 'Muestra una línea vertical configurable para marcar el ancho del glifo.', val: showCenterGuide, setVal: setShowCenterGuide }),
+            e('div', { style: { background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: R_BTN, padding: '12px', display: 'flex', flexDirection: 'column', gap: '12px' } },
+              e(SliderInput, { label: `X-Height (fila ${xHeightGuideRow})`, value: xHeightGuideRow, onChange: ev => setXHeightGuideRow(Number(ev.target.value)), min: 0, max: Math.max(0, gridSize - 1) }),
+              e(SliderInput, { label: `Guía vertical (col ${centerGuideCol})`, value: centerGuideCol, onChange: ev => setCenterGuideCol(Number(ev.target.value)), min: 0, max: Math.max(0, gridSize - 1) })
+            ),
+            e(GuidePreview)
+          ),
+          menu === 'view' && e(React.Fragment, null,
+            e('p', { style: { margin: 0, fontFamily: FONT_MONO, fontSize: '10px', color: 'var(--muted)', lineHeight: '1.6' } }, 'Ajustes visuales del editor.'),
+            e(ToggleCard, { title: 'Marcador del espacio', desc: 'Muestra una referencia visual en el carácter espacio para diferenciarlo de celdas vacías.', val: showSpaceMarker, setVal: setShowSpaceMarker }),
+            e(GuidePreview)
+          ),
+          menu === 'shortcuts' && e(React.Fragment, null,
+            e('p', { style: { margin: 0, fontFamily: FONT_MONO, fontSize: '10px', color: 'var(--muted)', lineHeight: '1.6' } }, 'Atajos de teclado disponibles en el editor.'),
+            e('div', { style: { display: 'flex', flexDirection: 'column', gap: '4px' } },
+              SHORTCUTS.map(([key, desc]) => e('div', { key, style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '7px 10px', borderRadius: R_BTN, background: 'var(--surface2)', border: '1px solid var(--border)' } },
+                e('kbd', { style: { fontFamily: FONT_MONO, fontSize: '9px', color: ACCENT, background: `${ACCENT}10`, border: `1px solid ${ACCENT}25`, borderRadius: '4px', padding: '2px 6px' } }, key),
+                e('span', { style: { fontFamily: FONT_MONO, fontSize: '10px', color: 'var(--muted)' } }, desc)
+              ))
+            )
+          )
+        )
+      ),
+      e('div', { style: { display: 'flex', justifyContent: 'flex-end' } },
+        e('button', { onClick: onClose, style: { padding: '10px 24px', background: ACCENT, border: 'none', borderRadius: R_BTN, color: '#fff', fontFamily: FONT_MONO, fontWeight: '700', fontSize: '11px', letterSpacing: '1px', cursor: 'pointer' } }, 'LISTO')
+      )
+    )
+  );
+};
+
+// ─────────────────────────────────────────────
+//  EDITOR PAGE  (componente principal)
+// ─────────────────────────────────────────────
 export function EditorPage({
-  user, isDark, toggleTheme,
-  gridSize, currentChar, fontData, grid, isSaving,
-  tool, setTool, previewText, setPreviewText,
-  onPixelDown, onPixelEnter, onMouseUp,
-  onSwitchChar, onClearCanvas, onInvert, onShift, onSave,
-  onUndo, onRedo,
-  onBack, onPublish, projectName,
-  isPublishing, publishedOk, onResetPublish
+  user, isDark, toggleTheme, gridSize, currentChar, fontData, grid, isSaving,
+  tool, setTool, previewText, setPreviewText, onPixelDown, onPixelEnter, onMouseUp,
+  onSwitchChar, onClearCanvas, onInvert, onShift, onSave, onUndo, onRedo,
+  onBack, onPublish, projectName, isPublishing, publishedOk, onResetPublish
 }) {
   const [showExport,      setShowExport]      = useState(false);
   const [showPublish,     setShowPublish]     = useState(false);
@@ -726,14 +319,23 @@ export function EditorPage({
   const [openFileMenu,    setOpenFileMenu]    = useState(false);
   const [openUserMenu,    setOpenUserMenu]    = useState(false);
   const [avatarColor,     setAvatarColor]     = useState(ACCENT);
-  const [showGuides,      setShowGuides]      = useState(true);
+  const [zoom,            setZoom]            = useState(100);
+  const [charFilter,      setCharFilter]      = useState('all');
+  const [charSearch,      setCharSearch]      = useState('');
   const [showSpaceMarker, setShowSpaceMarker] = useState(() => localStorage.getItem('cs-show-space-marker') !== '0');
   const [showCenterGuide, setShowCenterGuide] = useState(() => localStorage.getItem('cs-show-center-guide') !== '0');
   const [centerGuideCol,  setCenterGuideCol]  = useState(() => Number(localStorage.getItem('cs-center-guide-col') ?? 2));
   const [xHeightGuideRow, setXHeightGuideRow] = useState(() => Number(localStorage.getItem('cs-xheight-guide-row') ?? Math.round(gridSize * 0.33)));
 
   const avatarInit = (user?.displayName || user?.email || '?')[0].toUpperCase();
+  const CANVAS_BASE = 460;
+  const canvasSize = Math.round(CANVAS_BASE * zoom / 100);
 
+  const totalGlyphs = TECLADO.length;
+  const doneGlyphs  = TECLADO.filter(c => fontData?.[c]?.some(Boolean)).length;
+  const progress    = Math.round((doneGlyphs / totalGlyphs) * 100);
+
+  // Avatar color desde Firestore
   useEffect(() => {
     if (!user) return;
     import('./firebase.js').then(({ db }) => {
@@ -745,216 +347,168 @@ export function EditorPage({
     });
   }, [user]);
 
+  // Cerrar menús
   useEffect(() => {
     const close = () => { setOpenFileMenu(false); setOpenUserMenu(false); };
     if (openFileMenu || openUserMenu) window.addEventListener('click', close);
     return () => window.removeEventListener('click', close);
   }, [openFileMenu, openUserMenu]);
 
+  // Persistir ajustes
+  useEffect(() => { writeSetting(EDITOR_STORAGE_KEYS.showSpaceMarker, showSpaceMarker ? '1' : '0'); }, [showSpaceMarker]);
+  useEffect(() => { localStorage.setItem('cs-show-center-guide', showCenterGuide ? '1' : '0'); }, [showCenterGuide]);
   useEffect(() => {
-    writeSetting(EDITOR_STORAGE_KEYS.showSpaceMarker, showSpaceMarker ? '1' : '0');
-  }, [showSpaceMarker]);
-  useEffect(() => {
-    localStorage.setItem('cs-show-center-guide', showCenterGuide ? '1' : '0');
-  }, [showCenterGuide]);
-  useEffect(() => {
-    const clamped = Math.max(0, Math.min(gridSize - 1, centerGuideCol || 0));
+    const clamped = clamp(centerGuideCol || 0, 0, gridSize - 1);
     if (clamped !== centerGuideCol) setCenterGuideCol(clamped);
     localStorage.setItem('cs-center-guide-col', String(clamped));
   }, [centerGuideCol, gridSize]);
   useEffect(() => {
-    const clamped = Math.max(0, Math.min(gridSize - 1, xHeightGuideRow || 0));
+    const clamped = clamp(xHeightGuideRow || 0, 0, gridSize - 1);
     if (clamped !== xHeightGuideRow) setXHeightGuideRow(clamped);
     localStorage.setItem('cs-xheight-guide-row', String(clamped));
   }, [xHeightGuideRow, gridSize]);
 
-  const modeTools = [
-    { id: 'pencil',   iconName: 'pencil',   label: 'LIBRE'   },
-    { id: 'fill',     iconName: 'fill',     label: 'RELLENO' },
-    { id: 'mirror-h', iconName: 'mirror-h', label: 'ESP. H'  },
-    { id: 'mirror-v', iconName: 'mirror-v', label: 'ESP. V'  },
-  ];
-
-  const actionTools = [
-    { iconName: 'arrow-left',  label: 'UNDO',   fn: onUndo,              title: 'Deshacer (Ctrl+Z)' },
-    { iconName: 'arrow-right', label: 'REDO',   fn: onRedo,              title: 'Rehacer (Ctrl+Y)'  },
-    { iconName: 'invert',      label: 'INV',    fn: onInvert },
-    { iconName: 'arrow-up',    label: 'ARRIBA', fn: () => onShift('up')    },
-    { iconName: 'arrow-down',  label: 'ABAJO',  fn: () => onShift('down')  },
-    { iconName: 'mirror-h',    label: 'IZQ',    fn: () => onShift('left')  },
-    { iconName: 'mirror-v',    label: 'DER',    fn: () => onShift('right') },
-  ];
-
-  const toolbarBase = {
-    padding: '4px 5px', borderRadius: R_BTN, cursor: 'pointer',
-    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', minWidth: '52px',
-    fontFamily: FONT_MONO, border: 'none', transition: 'all .13s'
-  };
-
-  return React.createElement('div', { style: { display: 'flex', flexDirection: 'column', minHeight: '100vh' } },
-
-    /* ── NAVBAR ──────────────────────────── */
-    React.createElement('nav', {
-      style: {
-        height: '52px', padding: '0 20px',
-        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-        borderBottom: '1px solid var(--border)', background: 'var(--nav-bg)',
-        backdropFilter: 'blur(16px)', position: 'sticky', top: 0, zIndex: 200
+  // ── Keyboard shortcuts ────────────────────
+  useEffect(() => {
+    const handler = (ev) => {
+      if (['INPUT', 'TEXTAREA'].includes(ev.target.tagName)) return;
+      const ctrl = ev.ctrlKey || ev.metaKey;
+      if (ctrl && (ev.key === '+' || ev.key === '=')) { ev.preventDefault(); setZoom(z => Math.min(200, z + 25)); return; }
+      if (ctrl && ev.key === '-') { ev.preventDefault(); setZoom(z => Math.max(50, z - 25)); return; }
+      if (ctrl && ev.key === '0') { ev.preventDefault(); setZoom(100); return; }
+      if (ctrl && ev.key === 's') { ev.preventDefault(); onSave(); return; }
+      if (ctrl && ev.key === 'z' && !ev.shiftKey) { ev.preventDefault(); onUndo(); return; }
+      if (ctrl && (ev.key === 'y' || (ev.key === 'z' && ev.shiftKey))) { ev.preventDefault(); onRedo(); return; }
+      if (ctrl && ev.key === 'i') { ev.preventDefault(); onInvert(); return; }
+      if (!ctrl) {
+        if (ev.key === 'p') { setTool('pencil'); return; }
+        if (ev.key === 'f') { setTool('fill'); return; }
+        if (ev.key === 'h') { setTool('mirror-h'); return; }
+        if (ev.key === 'v') { setTool('mirror-v'); return; }
+        if (ev.key === 'ArrowUp')    { ev.preventDefault(); onShift('up'); return; }
+        if (ev.key === 'ArrowDown')  { ev.preventDefault(); onShift('down'); return; }
+        if (ev.key === 'ArrowLeft')  { ev.preventDefault(); onShift('left'); return; }
+        if (ev.key === 'ArrowRight') { ev.preventDefault(); onShift('right'); return; }
+        if (ev.key === 'Delete' || ev.key === 'Backspace') { onClearCanvas(); return; }
       }
-    },
-      React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '4px' } },
-        React.createElement('span', {
-          onClick: onBack,
-          style: {
-            fontFamily: FONT_PIXEL, fontSize: '11px', color: ACCENT,
-            letterSpacing: '2px', cursor: 'pointer', padding: '6px 10px',
-            borderRadius: R_BTN, transition: 'opacity .15s'
-          }
-        }, 'CODESHELF'),
+      if (ev.key === 'Escape') {
+        setShowExport(false); setShowPublish(false); setShowPrefs(false);
+        setOpenFileMenu(false); setOpenUserMenu(false);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [onSave, onUndo, onRedo, onInvert, onShift, onClearCanvas, setTool]);
 
-        // File dropdown
-        React.createElement('div', { style: { position: 'relative' } },
-          React.createElement('button', {
-            onClick: e => { e.stopPropagation(); setOpenFileMenu(v => !v); },
-            style: {
-              fontFamily: FONT_MONO, fontSize: '9px', letterSpacing: '2px',
-              color: 'var(--muted)', padding: '6px 12px', borderRadius: R_BTN,
-              background: 'none', border: 'none', cursor: 'pointer',
-              transition: 'color .15s, background .15s'
-            }
-          }, 'ARCHIVO'),
-          openFileMenu && React.createElement('div', {
-            onClick: e => e.stopPropagation(),
-            style: {
-              position: 'absolute', top: 'calc(100% + 8px)', left: 0,
-              background: 'var(--surface)', border: '1px solid var(--border2)',
-              borderRadius: '10px', minWidth: '210px', zIndex: 300,
-              boxShadow: 'var(--shadow-card)', overflow: 'hidden', padding: '6px'
-            }
-          },
+  // Filtrado de caracteres
+  const filteredChars = useMemo(() => {
+    let chars = TECLADO;
+    if (charSearch) { const q = charSearch.toLowerCase(); chars = chars.filter(c => c.toLowerCase().includes(q)); }
+    if (charFilter === 'done')  chars = chars.filter(c => fontData?.[c]?.some(Boolean));
+    if (charFilter === 'empty') chars = chars.filter(c => !fontData?.[c]?.some(Boolean));
+    return chars;
+  }, [charSearch, charFilter, fontData]);
+
+  const modeTools = [
+    { id: 'pencil',   iconName: 'pencil',   label: 'LÁPIZ',  tooltip: 'Lápiz (P)' },
+    { id: 'fill',     iconName: 'fill',     label: 'FILL',   tooltip: 'Relleno (F)' },
+    { id: 'mirror-h', iconName: 'mirror-h', label: 'ESP. H', tooltip: 'Espejo H (H)' },
+    { id: 'mirror-v', iconName: 'mirror-v', label: 'ESP. V', tooltip: 'Espejo V (V)' },
+  ];
+  const actionTools = [
+    { iconName: 'arrow-left',  label: 'UNDO',  tooltip: 'Deshacer (Ctrl+Z)', fn: onUndo },
+    { iconName: 'arrow-right', label: 'REDO',  tooltip: 'Rehacer (Ctrl+Y)', fn: onRedo },
+    { iconName: 'invert',      label: 'INV',   tooltip: 'Invertir (Ctrl+I)', fn: onInvert },
+    { iconName: 'arrow-up',    label: '↑',     tooltip: 'Subir (↑)', fn: () => onShift('up') },
+    { iconName: 'arrow-down',  label: '↓',     tooltip: 'Bajar (↓)', fn: () => onShift('down') },
+    { iconName: 'mirror-h',    label: '←',     tooltip: 'Izquierda (←)', fn: () => onShift('left') },
+    { iconName: 'mirror-v',    label: '→',     tooltip: 'Derecha (→)', fn: () => onShift('right') },
+  ];
+  const toolbarBase = { padding: '6px 7px', borderRadius: R_BTN, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', minWidth: '48px', fontFamily: FONT_MONO, border: 'none', transition: 'all .13s' };
+
+  // ─────────────────────────────────────────────
+  //  RENDER
+  // ─────────────────────────────────────────────
+  return e('div', { style: { display: 'flex', flexDirection: 'column', minHeight: '100vh' } },
+
+    // ── NAVBAR ──────────────────────────────────
+    e('nav', { style: { height: '52px', padding: '0 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border)', background: 'var(--nav-bg)', backdropFilter: 'blur(16px)', position: 'sticky', top: 0, zIndex: 200 } },
+      e('div', { style: { display: 'flex', alignItems: 'center', gap: '4px' } },
+        e('span', { onClick: onBack, style: { fontFamily: FONT_PIXEL, fontSize: '11px', color: ACCENT, letterSpacing: '2px', cursor: 'pointer', padding: '6px 10px', borderRadius: R_BTN, transition: 'opacity .15s' } }, 'CODESHELF'),
+
+        // Menú Archivo
+        e('div', { style: { position: 'relative' } },
+          e('button', { onClick: ev => { ev.stopPropagation(); setOpenFileMenu(v => !v); }, style: { fontFamily: FONT_MONO, fontSize: '9px', letterSpacing: '2px', color: openFileMenu ? 'var(--text)' : 'var(--muted)', padding: '6px 12px', borderRadius: R_BTN, background: openFileMenu ? 'var(--surface2)' : 'none', border: openFileMenu ? '1px solid var(--border)' : '1px solid transparent', cursor: 'pointer', transition: 'all .15s' } }, 'ARCHIVO'),
+          openFileMenu && e('div', { onClick: ev => ev.stopPropagation(), style: { position: 'absolute', top: 'calc(100% + 8px)', left: 0, background: 'var(--surface)', border: '1px solid var(--border2)', borderRadius: '12px', minWidth: '230px', zIndex: 300, boxShadow: '0 20px 60px rgba(0,0,0,0.22)', overflow: 'hidden', padding: '6px' } },
             [
-              { icon: 'fonts',   label: 'Mis proyectos',               fn: onBack },
-              { icon: 'save',    label: 'Guardar proyecto (Ctrl+S)',    fn: onSave },
-              { icon: 'theme',   label: 'Preferencias del editor',     fn: () => { setShowPrefs(true); setOpenFileMenu(false); } },
-              { icon: 'export',  label: 'Exportar fuente',             fn: () => { setShowExport(true); setOpenFileMenu(false); } },
-              { icon: 'publish', label: 'Publicar en galería',         fn: () => { setShowPublish(true); setOpenFileMenu(false); } },
-            ].map(({ icon, label, fn }) =>
-              React.createElement('button', {
-                key: label, onClick: () => { fn(); setOpenFileMenu(false); },
-                style: {
-                  display: 'flex', alignItems: 'center', gap: '10px',
-                  width: '100%', padding: '10px 12px', background: 'none', border: '1px solid transparent', borderRadius: '8px',
-                  cursor: 'pointer', fontFamily: FONT_MONO, fontSize: '11px',
-                  color: 'var(--muted)', textAlign: 'left', transition: 'background .12s, color .12s'
-                },
-                onMouseEnter: e => { e.currentTarget.style.background = 'var(--surface2)'; e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text)'; },
-                onMouseLeave: e => { e.currentTarget.style.background = 'none'; e.currentTarget.style.borderColor = 'transparent'; e.currentTarget.style.color = 'var(--muted)'; }
-              },
-                React.createElement(ToolIcon, { name: icon, size: 14, style: { opacity: .5, filter: 'var(--icon-filter)' } }),
-                label
+              { icon: 'fonts',   label: 'Mis proyectos',     kbd: '',       fn: onBack },
+              { icon: 'save',    label: 'Guardar',           kbd: 'Ctrl+S', fn: onSave },
+              { icon: 'theme',   label: 'Preferencias',      kbd: '',       fn: () => { setShowPrefs(true); setOpenFileMenu(false); } },
+              { icon: 'export',  label: 'Exportar fuente',   kbd: '',       fn: () => { setShowExport(true); setOpenFileMenu(false); } },
+              { icon: 'publish', label: 'Publicar en galería', kbd: '',     fn: () => { setShowPublish(true); setOpenFileMenu(false); } },
+            ].map(({ icon, label, kbd, fn }) =>
+              e('button', { key: label, onClick: () => { fn(); setOpenFileMenu(false); }, style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '9px 12px', background: 'none', border: '1px solid transparent', borderRadius: '8px', cursor: 'pointer', fontFamily: FONT_MONO, color: 'var(--muted)', textAlign: 'left', transition: 'all .12s' }, onMouseEnter: ev => { ev.currentTarget.style.background = 'var(--surface2)'; ev.currentTarget.style.borderColor = 'var(--border)'; ev.currentTarget.style.color = 'var(--text)'; }, onMouseLeave: ev => { ev.currentTarget.style.background = 'none'; ev.currentTarget.style.borderColor = 'transparent'; ev.currentTarget.style.color = 'var(--muted)'; } },
+                e('div', { style: { display: 'flex', alignItems: 'center', gap: '10px' } },
+                  e('img', { src: `./src/icons/${icon}.svg`, style: { width: '14px', height: '14px', filter: 'var(--icon-filter)', opacity: .5 } }),
+                  e('span', { style: { fontSize: '11px' } }, label)
+                ),
+                kbd && e('kbd', { style: { fontFamily: FONT_MONO, fontSize: '8px', color: 'var(--muted2)', background: 'var(--surface3)', borderRadius: '3px', padding: '1px 5px', border: '1px solid var(--border)' } }, kbd)
               )
             )
           )
         ),
-
-        React.createElement('span', {
-          style: {
-            fontFamily: FONT_MONO, fontSize: '9px', letterSpacing: '2px',
-            color: 'var(--muted2)', paddingLeft: '8px'
-          }
-        }, projectName || '')
+        e('span', { style: { fontFamily: FONT_MONO, fontSize: '9px', letterSpacing: '2px', color: 'var(--muted2)', paddingLeft: '8px', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, projectName || '')
       ),
 
-      React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
-        // Indicador de guardado (solo visible al guardar explícitamente)
-        isSaving && React.createElement('span', {
-          style: { fontFamily: FONT_MONO, fontSize: '9px', color: 'var(--muted2)', letterSpacing: '2px' }
-        }, 'GUARDANDO...'),
+      // Derecha del navbar
+      e('div', { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
+        // Estado de guardado
+        isSaving && e('div', { style: { fontFamily: FONT_MONO, fontSize: '9px', letterSpacing: '1px', color: ACCENT, display: 'flex', alignItems: 'center', gap: '5px' } }, '◐ GUARDANDO'),
 
-        React.createElement('button', {
-          onClick: () => setShowSpaceMarker(v => !v),
-          title: showSpaceMarker ? 'Ocultar marcador de espacio' : 'Mostrar marcador de espacio',
-          style: {
-            height: '32px', padding: '0 10px', borderRadius: R_BTN,
-            background: showSpaceMarker ? ACCENT : 'var(--surface2)',
-            border: showSpaceMarker ? 'none' : '1px solid var(--border)',
-            cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px',
-            fontFamily: FONT_MONO, fontSize: '8px', letterSpacing: '1px',
-            color: showSpaceMarker ? '#fff' : 'var(--muted)', transition: 'all .15s'
-          }
-        },
-          React.createElement('span', { style: { fontSize: '11px', lineHeight: 1 } }, '␠'),
-          'ESPACIO'
+        // Progreso
+        e(Tooltip, { label: `${doneGlyphs}/${totalGlyphs} glifos (${progress}%)`, placement: 'bottom' },
+          e('div', { style: { display: 'flex', alignItems: 'center', gap: '6px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: R_BTN, padding: '5px 10px', cursor: 'default' } },
+            e('div', { style: { width: '48px', height: '4px', background: 'var(--border)', borderRadius: '2px', overflow: 'hidden' } },
+              e('div', { style: { width: `${progress}%`, height: '100%', background: ACCENT, borderRadius: '2px', transition: 'width .3s ease' } })
+            ),
+            e('span', { style: { fontFamily: FONT_MONO, fontSize: '9px', color: 'var(--muted)', letterSpacing: '1px' } }, `${progress}%`)
+          )
         ),
 
-        React.createElement('button', {
-          onClick: toggleTheme, title: isDark ? 'Tema claro' : 'Tema oscuro',
-          style: {
-            width: '32px', height: '32px', borderRadius: '50%',
-            background: 'var(--surface2)', border: '1px solid var(--border)',
-            cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-            transition: 'background .15s'
-          }
-        },
-          React.createElement(ToolIcon, { name: 'theme', size: 14 })
+        // Zoom control
+        e(ZoomControl, { zoom, setZoom }),
+
+        // Espacio marcador
+        e(Tooltip, { label: showSpaceMarker ? 'Ocultar marcador' : 'Marcador de espacio', placement: 'bottom' },
+          e('button', { onClick: () => setShowSpaceMarker(v => !v), style: { height: '32px', padding: '0 10px', borderRadius: R_BTN, background: showSpaceMarker ? ACCENT : 'var(--surface2)', border: showSpaceMarker ? 'none' : '1px solid var(--border)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontFamily: FONT_MONO, fontSize: '8px', letterSpacing: '1px', color: showSpaceMarker ? '#fff' : 'var(--muted)', transition: 'all .15s' } },
+            e('span', { style: { fontSize: '12px', lineHeight: 1 } }, '␠'), 'ESPACIO'
+          )
+        ),
+
+        // Tema
+        e(Tooltip, { label: isDark ? 'Modo claro' : 'Modo oscuro', placement: 'bottom' },
+          e('button', { onClick: toggleTheme, style: { width: '32px', height: '32px', borderRadius: '50%', background: 'var(--surface2)', border: '1px solid var(--border)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background .15s' } },
+            e('img', { src: './src/icons/theme.svg', style: { width: '14px', height: '14px', filter: 'var(--icon-filter)' } })
+          )
         ),
 
         // Avatar + menú usuario
-        React.createElement('div', { style: { position: 'relative' } },
-          React.createElement('div', {
-            onClick: e => { e.stopPropagation(); setOpenUserMenu(v => !v); },
-            style: {
-              width: '32px', height: '32px', borderRadius: '50%',
-              border: `1.5px solid ${avatarColor}`, background: avatarColor + '20',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontFamily: FONT_PIXEL, fontSize: '9px', color: avatarColor,
-              cursor: 'pointer', userSelect: 'none', transition: 'background .15s'
-            }
-          }, avatarInit),
-
-          openUserMenu && React.createElement('div', {
-            onClick: e => e.stopPropagation(),
-            style: {
-              position: 'absolute', top: 'calc(100% + 10px)', right: 0,
-              background: 'var(--surface)', border: '1px solid var(--border2)',
-              borderRadius: '12px', minWidth: '210px', zIndex: 300,
-              boxShadow: '0 20px 56px rgba(0,0,0,0.18)', overflow: 'hidden', padding: '5px 0'
-            }
-          },
-            React.createElement('div', {
-              style: { padding: '12px 16px', borderBottom: '1px solid var(--border)', fontFamily: FONT_MONO, fontSize: '10px', color: 'var(--muted)' }
-            }, user?.email || ''),
+        e('div', { style: { position: 'relative' } },
+          e('div', { onClick: ev => { ev.stopPropagation(); setOpenUserMenu(v => !v); }, style: { width: '32px', height: '32px', borderRadius: '50%', border: `1.5px solid ${avatarColor}`, background: `${avatarColor}20`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: FONT_PIXEL, fontSize: '9px', color: avatarColor, cursor: 'pointer', userSelect: 'none', transition: 'background .15s' } }, avatarInit),
+          openUserMenu && e('div', { onClick: ev => ev.stopPropagation(), style: { position: 'absolute', top: 'calc(100% + 10px)', right: 0, background: 'var(--surface)', border: '1px solid var(--border2)', borderRadius: '12px', minWidth: '210px', zIndex: 300, boxShadow: '0 20px 56px rgba(0,0,0,0.18)', overflow: 'hidden', padding: '5px 0' } },
+            e('div', { style: { padding: '12px 16px', borderBottom: '1px solid var(--border)', fontFamily: FONT_MONO, fontSize: '10px', color: 'var(--muted)' } }, user?.email || ''),
             [
               { icon: 'explore', label: 'Explorar fuentes', fn: () => window.location.href = 'social.html' },
               { icon: 'fonts',   label: 'Mis proyectos',    fn: onBack },
               { icon: 'user',    label: 'Mi perfil',        fn: () => window.location.href = 'profile.html' },
             ].map(({ icon, label, fn }) =>
-              React.createElement('button', {
-                key: label, onClick: () => { fn(); setOpenUserMenu(false); },
-                style: {
-                  display: 'flex', alignItems: 'center', gap: '10px', width: '100%', padding: '9px 16px',
-                  background: 'none', border: 'none', cursor: 'pointer',
-                  fontFamily: FONT_MONO, fontSize: '11px', color: 'var(--muted)', textAlign: 'left',
-                  transition: 'background .12s, color .12s'
-                },
-                onMouseEnter: e => { e.currentTarget.style.background = 'var(--surface2)'; e.currentTarget.style.color = 'var(--text)'; },
-                onMouseLeave: e => { e.currentTarget.style.background = 'none'; e.currentTarget.style.color = 'var(--muted)'; }
-              },
-                React.createElement(ToolIcon, { name: icon, size: 14, style: { opacity: .5, filter: 'var(--icon-filter)' } }),
-                label
+              e('button', { key: label, onClick: () => { fn(); setOpenUserMenu(false); }, style: { display: 'flex', alignItems: 'center', gap: '10px', width: '100%', padding: '9px 16px', background: 'none', border: 'none', cursor: 'pointer', fontFamily: FONT_MONO, fontSize: '11px', color: 'var(--muted)', textAlign: 'left', transition: 'all .12s' }, onMouseEnter: ev => { ev.currentTarget.style.background = 'var(--surface2)'; ev.currentTarget.style.color = 'var(--text)'; }, onMouseLeave: ev => { ev.currentTarget.style.background = 'none'; ev.currentTarget.style.color = 'var(--muted)'; } },
+                e('img', { src: `./src/icons/${icon}.svg`, style: { width: '14px', height: '14px', filter: 'var(--icon-filter)', opacity: .5 } }), label
               )
             ),
-            React.createElement('div', { style: { borderTop: '1px solid var(--border)', marginTop: '4px', paddingTop: '4px' } },
-              React.createElement('button', {
-                onClick: () => signOut(auth).then(() => window.location.replace('index.html')),
-                style: {
-                  display: 'flex', alignItems: 'center', gap: '10px', width: '100%', padding: '9px 16px',
-                  background: 'none', border: 'none', cursor: 'pointer',
-                  fontFamily: FONT_MONO, fontSize: '11px', color: ACCENT, textAlign: 'left'
-                }
-              },
-                React.createElement(ToolIcon, { name: 'logout', size: 14, style: { opacity: .65 } }),
-                'Cerrar sesión'
+            e('div', { style: { borderTop: '1px solid var(--border)', marginTop: '4px', paddingTop: '4px' } },
+              e('button', { onClick: () => signOut(auth).then(() => window.location.replace('index.html')), style: { display: 'flex', alignItems: 'center', gap: '10px', width: '100%', padding: '9px 16px', background: 'none', border: 'none', cursor: 'pointer', fontFamily: FONT_MONO, fontSize: '11px', color: ACCENT, textAlign: 'left' } },
+                e('img', { src: './src/icons/logout.svg', style: { width: '14px', height: '14px', opacity: .65, filter: 'var(--icon-filter)' } }), 'Cerrar sesión'
               )
             )
           )
@@ -962,309 +516,182 @@ export function EditorPage({
       )
     ),
 
-    /* ── MAIN LAYOUT ─────────────────────── */
-    React.createElement('main', {
-      style: {
-        padding: '20px', maxWidth: '1200px', margin: '0 auto', width: '100%',
-        display: 'grid', gridTemplateColumns: '220px 1fr 380px', gap: '18px', alignItems: 'start'
-      }
-    },
+    // ── MAIN LAYOUT ────────────────────────────
+    e('main', { style: { padding: '20px', maxWidth: '1280px', margin: '0 auto', width: '100%', display: 'grid', gridTemplateColumns: '230px 1fr 360px', gap: '18px', alignItems: 'start' } },
 
-      /* ── Left Preview Panel ── */
-      React.createElement('aside', {
-        style: {
-          background: 'var(--surface)', border: '1px solid var(--border)',
-          borderRadius: '12px', padding: '14px', position: 'sticky', top: '68px',
-          boxShadow: 'var(--shadow-card)', display: 'flex', flexDirection: 'column', gap: '10px'
-        }
-      },
-        React.createElement('div', {
-          style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' }
-        },
-          React.createElement('span', { style: { fontFamily: FONT_MONO, fontSize: '8px', letterSpacing: '3px', color: 'var(--muted)' } }, 'PREVIEW'),
-          React.createElement('input', {
-            value: previewText, onChange: e => setPreviewText(e.target.value),
-            placeholder: 'texto...',
-            style: {
-              background: 'none', border: 'none', outline: 'none',
-              color: 'var(--muted2)', fontSize: '10px', fontFamily: FONT_MONO,
-              textAlign: 'right', width: '90px'
-            }
-          })
+      // ── PANEL IZQUIERDO ──────────────────────
+      e('aside', { style: { background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', padding: '16px', position: 'sticky', top: '68px', boxShadow: 'var(--shadow-card)', display: 'flex', flexDirection: 'column', gap: '12px' } },
+        e('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' } },
+          e('span', { style: { fontFamily: FONT_MONO, fontSize: '8px', letterSpacing: '3px', color: 'var(--muted)' } }, 'PREVIEW'),
+          e('input', { value: previewText, onChange: ev => setPreviewText(ev.target.value), placeholder: 'texto...', style: { background: 'none', border: 'none', outline: 'none', color: 'var(--muted2)', fontSize: '10px', fontFamily: FONT_MONO, textAlign: 'right', width: '100px' } })
         ),
-        React.createElement('div', {
-          style: {
-            background: 'var(--canvas-bg)', borderRadius: '6px', padding: '6px',
-            height: '50px', overflowX: 'auto', overflowY: 'hidden',
-            display: 'flex', alignItems: 'center', whiteSpace: 'nowrap',
-            scrollbarWidth: 'thin'
-          }
-        },
-          React.createElement('div', {
-            style: { display: 'flex', gap: '0px', alignItems: 'center', flexShrink: 0 }
-          },
+        e('div', { style: { background: 'var(--canvas-bg)', borderRadius: '8px', padding: '8px', height: '56px', overflowX: 'auto', overflowY: 'hidden', display: 'flex', alignItems: 'center', whiteSpace: 'nowrap', scrollbarWidth: 'thin', border: '1px solid var(--border)' } },
+          e('div', { style: { display: 'flex', gap: '0px', alignItems: 'center', flexShrink: 0 } },
             previewText.split('').map((ch, ci) => {
-              const glyph = fontData[ch];
-              const sz = Math.min(gridSize, 14), px = 2;
-              const isSpace = ch === ' ';
-              return React.createElement('div', {
-                key: ci,
-                style: {
-                  display: 'grid', gridTemplateColumns: `repeat(${sz},${px}px)`,
-                  marginRight: '1px', flexShrink: 0,
-                  border: (isSpace && showSpaceMarker) ? '1px dashed var(--border)' : 'none',
-                  borderRadius: '2px',
-                  minWidth: isSpace ? `${sz * px}px` : undefined
-                }
-              },
-                isSpace ? null : Array(sz * sz).fill(0).map((_, pi) =>
-                  React.createElement('div', {
-                    key: pi,
-                    style: { width: `${px}px`, height: `${px}px`, background: glyph?.[pi] ? ACCENT : 'transparent' }
-                  })
-                )
+              const glyph = fontData[ch]; const sz = Math.min(gridSize, 14), px = 2; const isSpace = ch === ' ';
+              return e('div', { key: ci, style: { display: 'grid', gridTemplateColumns: `repeat(${sz},${px}px)`, marginRight: '1px', flexShrink: 0, border: (isSpace && showSpaceMarker) ? '1px dashed var(--border)' : 'none', borderRadius: '2px', minWidth: isSpace ? `${sz * px}px` : undefined } },
+                isSpace ? null : Array(sz * sz).fill(0).map((_, pi) => e('div', { key: pi, style: { width: `${px}px`, height: `${px}px`, background: glyph?.[pi] ? ACCENT : 'transparent' } }))
               );
             })
           )
+        ),
+        e('div', { style: { height: '1px', background: 'var(--border)' } }),
+        // Stats
+        e('div', { style: { display: 'flex', gap: '6px' } },
+          [{ val: doneGlyphs, lbl: 'GLIFOS' }, { val: gridSize, lbl: 'GRID' }, { val: grid.filter(Boolean).length, lbl: 'PX' }].map(({ val, lbl }) =>
+            e('div', { key: lbl, style: { flex: 1, textAlign: 'center', padding: '8px 4px', background: 'var(--surface2)', borderRadius: R_BTN, border: '1px solid var(--border)' } },
+              e('div', { style: { fontSize: '16px', fontWeight: '700', color: ACCENT, fontFamily: FONT_MONO } }, val),
+              e('div', { style: { fontSize: '7px', color: 'var(--muted)', letterSpacing: '2px', fontFamily: FONT_MONO, marginTop: '2px' } }, lbl)
+            )
+          )
+        ),
+        // Barra progreso
+        e('div', { style: { display: 'flex', flexDirection: 'column', gap: '5px' } },
+          e('div', { style: { display: 'flex', justifyContent: 'space-between' } },
+            e('span', { style: { fontFamily: FONT_MONO, fontSize: '8px', color: 'var(--muted)', letterSpacing: '1px' } }, 'PROGRESO'),
+            e('span', { style: { fontFamily: FONT_MONO, fontSize: '8px', color: ACCENT } }, `${progress}%`)
+          ),
+          e('div', { style: { height: '5px', background: 'var(--border)', borderRadius: '3px', overflow: 'hidden' } },
+            e('div', { style: { width: `${progress}%`, height: '100%', background: ACCENT, borderRadius: '3px', transition: 'width .4s ease' } })
+          )
+        ),
+        // Acciones rápidas
+        e('div', { style: { display: 'flex', flexDirection: 'column', gap: '5px' } },
+          e('span', { style: { fontFamily: FONT_MONO, fontSize: '8px', letterSpacing: '2px', color: 'var(--muted2)' } }, 'ACCIONES RÁPIDAS'),
+          e('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '5px' } },
+            [
+              { label: '⬇ Exportar', fn: () => setShowExport(true), primary: true },
+              { label: '🌐 Publicar', fn: () => setShowPublish(true), primary: false },
+              { label: '⚙ Prefs',    fn: () => setShowPrefs(true),   primary: false },
+              { label: '💾 Guardar', fn: onSave,                     primary: false },
+            ].map(({ label, fn, primary }) =>
+              e('button', { key: label, onClick: fn, style: { padding: '8px 6px', borderRadius: R_BTN, cursor: 'pointer', fontFamily: FONT_MONO, fontSize: '9px', letterSpacing: '0.5px', background: primary ? ACCENT : 'var(--surface2)', color: primary ? '#fff' : 'var(--muted)', border: primary ? 'none' : '1px solid var(--border)', transition: 'all .13s', fontWeight: primary ? '700' : '400' } }, label)
+            )
+          )
         )
       ),
 
-      /* Canvas section */
-      React.createElement('section', {
-        style: {
-          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px',
-          background: 'var(--surface)', borderRadius: R_CARD,
-          border: '1px solid var(--border)', padding: '24px',
-          boxShadow: 'var(--shadow-card)'
-        }
-      },
-        /* Char header */
-        React.createElement('div', {
-          style: { display: 'flex', alignItems: 'center', gap: '16px', width: '100%' }
-        },
-          React.createElement('div', {
-            style: { fontFamily: FONT_PIXEL, fontSize: '40px', lineHeight: 1, color: ACCENT, minWidth: '52px', textAlign: 'center' }
-          }, currentChar === ' ' ? '·' : currentChar),
-          React.createElement('div', { style: { flex: 1 } },
-            React.createElement('div', {
-              style: { fontFamily: FONT_MONO, fontSize: '9px', color: 'var(--muted)', letterSpacing: '2px', marginBottom: '4px' }
-            }, 'EDITANDO CARÁCTER'),
-            React.createElement('div', {
-              style: { fontFamily: FONT_MONO, fontSize: '11px', color: 'var(--text)', letterSpacing: '1px' }
-            }, `U+${(currentChar.codePointAt(0) || 0).toString(16).toUpperCase().padStart(4,'0')} · Grid ${gridSize}×${gridSize}`),
-            (currentChar === ' ' && showSpaceMarker) && React.createElement('div', {
-              style: { fontFamily: FONT_MONO, fontSize: '9px', color: 'var(--muted2)', letterSpacing: '1px', marginTop: '4px' }
-            }, 'Marcador de espacio activo')
-          )
+      // ── CANVAS CENTRAL ───────────────────────
+      e('section', { style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '14px', background: 'var(--surface)', borderRadius: R_CARD, border: '1px solid var(--border)', padding: '20px', boxShadow: 'var(--shadow-card)' } },
+        // Carácter activo
+        e('div', { style: { display: 'flex', alignItems: 'center', gap: '16px', width: '100%' } },
+          e('div', { style: { fontFamily: FONT_PIXEL, fontSize: '36px', lineHeight: 1, color: ACCENT, minWidth: '52px', textAlign: 'center', textShadow: `0 0 20px ${ACCENT}40` } }, currentChar === ' ' ? '·' : currentChar),
+          e('div', { style: { flex: 1 } },
+            e('div', { style: { fontFamily: FONT_MONO, fontSize: '9px', color: 'var(--muted)', letterSpacing: '2px', marginBottom: '4px' } }, 'EDITANDO CARÁCTER'),
+            e('div', { style: { fontFamily: FONT_MONO, fontSize: '11px', color: 'var(--text)', letterSpacing: '1px' } }, `U+${(currentChar.codePointAt(0) || 0).toString(16).toUpperCase().padStart(4,'0')} · Grid ${gridSize}×${gridSize}`),
+            (currentChar === ' ' && showSpaceMarker) && e('div', { style: { fontFamily: FONT_MONO, fontSize: '9px', color: 'var(--muted2)', letterSpacing: '1px', marginTop: '3px' } }, 'Marcador de espacio activo')
+          ),
+          e(ZoomControl, { zoom, setZoom })
         ),
 
-        /* Toolbar */
-        React.createElement('div', {
-          style: {
-            display: 'flex', gap: '1px', alignItems: 'center', flexWrap: 'wrap',
-            padding: '8px', background: 'var(--surface2)', borderRadius: R_CARD,
-            border: '1px solid var(--border)', width: '100%'
-          }
-        },
+        // Toolbar
+        e('div', { style: { display: 'flex', gap: '1px', alignItems: 'center', flexWrap: 'wrap', padding: '6px', background: 'var(--surface2)', borderRadius: R_CARD, border: '1px solid var(--border)', width: '100%' } },
           ...modeTools.map(t =>
-            React.createElement('button', {
-              key: t.id, onClick: () => setTool(t.id), title: t.label,
-              style: {
-                ...toolbarBase,
-                background: tool === t.id ? ACCENT : 'transparent',
-                color: tool === t.id ? '#fff' : 'var(--muted)',
-              }
-            },
-              React.createElement(ToolIcon, { name: t.iconName, size: 16, active: tool === t.id }),
-              React.createElement('span', { style: { fontSize: '8px', letterSpacing: '1px' } }, t.label)
+            e(Tooltip, { key: t.id, label: t.tooltip, placement: 'bottom' },
+              e('button', { onClick: () => setTool(t.id), style: { ...toolbarBase, background: tool === t.id ? ACCENT : 'transparent', color: tool === t.id ? '#fff' : 'var(--muted)', boxShadow: tool === t.id ? `0 2px 8px ${ACCENT}40` : 'none' } },
+                e('img', { src: `./src/icons/${t.iconName}.svg`, style: { width: '16px', height: '16px', filter: tool === t.id ? 'invert(1)' : 'var(--icon-filter)', opacity: tool === t.id ? 1 : .65 } }),
+                e('span', { style: { fontSize: '7px', letterSpacing: '0.5px' } }, t.label)
+              )
             )
           ),
-          React.createElement('div', { style: { width: '1px', height: '44px', background: 'var(--border)', margin: '0 2px' } }),
+          e('div', { style: { width: '1px', height: '40px', background: 'var(--border)', margin: '0 3px' } }),
           ...actionTools.map((t, i) =>
-            React.createElement('button', {
-              key: i, onClick: t.fn, title: t.label,
-              style: {
-                ...toolbarBase,
-                background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--muted)'
-              },
-              onMouseEnter: e => { e.currentTarget.style.background = 'var(--surface3)'; e.currentTarget.style.borderColor = 'var(--border2)'; },
-              onMouseLeave: e => { e.currentTarget.style.background = 'var(--surface)'; e.currentTarget.style.borderColor = 'var(--border)'; }
-            },
-              React.createElement(ToolIcon, { name: t.iconName, size: 16 }),
-              React.createElement('span', { style: { fontSize: '8px', letterSpacing: '1px' } }, t.label)
+            e(Tooltip, { key: i, label: t.tooltip, placement: 'bottom' },
+              e('button', { onClick: t.fn, style: { ...toolbarBase, background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--muted)' }, onMouseEnter: ev => { ev.currentTarget.style.background = 'var(--surface3)'; ev.currentTarget.style.borderColor = 'var(--border2)'; }, onMouseLeave: ev => { ev.currentTarget.style.background = 'var(--surface)'; ev.currentTarget.style.borderColor = 'var(--border)'; } },
+                e('img', { src: `./src/icons/${t.iconName}.svg`, style: { width: '16px', height: '16px', filter: 'var(--icon-filter)', opacity: .65 } }),
+                e('span', { style: { fontSize: '7px', letterSpacing: '0.5px' } }, t.label)
+              )
+            )
+          ),
+          e('div', { style: { width: '1px', height: '40px', background: 'var(--border)', margin: '0 3px' } }),
+          e(Tooltip, { label: 'Limpiar glifo (Delete)', placement: 'bottom' },
+            e('button', { onClick: onClearCanvas, style: { ...toolbarBase, background: 'rgba(191,69,69,0.07)', border: '1px solid rgba(191,69,69,0.2)', color: ACCENT }, onMouseEnter: ev => { ev.currentTarget.style.background = 'rgba(191,69,69,0.14)'; }, onMouseLeave: ev => { ev.currentTarget.style.background = 'rgba(191,69,69,0.07)'; } },
+              e('img', { src: './src/icons/delete.svg', style: { width: '16px', height: '16px', opacity: .7 } }),
+              e('span', { style: { fontSize: '7px', letterSpacing: '0.5px' } }, 'BORRAR')
             )
           )
         ),
 
-        /* Pixel canvas */
-        React.createElement('div', {
-          style: { position: 'relative', width: 'min(78vw, 460px)', height: 'min(78vw, 460px)' }
-        },
-          React.createElement('div', {
-            style: {
-              display: 'grid',
-              gridTemplateColumns: `repeat(${gridSize}, 1fr)`,
-              width: '100%', height: '100%',
-              gap: '1px', background: 'var(--grid-line)',
-              borderRadius: R_CARD, overflow: 'hidden',
-              border: `2px solid var(--border-accent)`,
-              cursor: 'crosshair', userSelect: 'none',
-              boxShadow: 'var(--shadow-card)'
-            },
+        // Canvas de píxeles
+        e('div', { style: { position: 'relative', width: `${canvasSize}px`, height: `${canvasSize}px`, transition: 'width .2s ease, height .2s ease' } },
+          e('div', {
+            style: { display: 'grid', gridTemplateColumns: `repeat(${gridSize}, 1fr)`, width: '100%', height: '100%', gap: '1px', background: 'var(--grid-line)', borderRadius: R_CARD, overflow: 'hidden', border: `2px solid var(--border-accent)`, cursor: 'crosshair', userSelect: 'none', boxShadow: `var(--shadow-card), 0 0 0 1px ${ACCENT}10` },
             onMouseUp: onMouseUp, onMouseLeave: onMouseUp
           },
             grid.map((active, i) =>
-              React.createElement('div', {
-                key: i,
-                onMouseDown: e => { e.preventDefault(); onPixelDown(i, active, e.button === 2); },
-                onMouseEnter: () => onPixelEnter(i),
-                onContextMenu: e => e.preventDefault(),
-                style: {
-                  width: '100%', height: '100%', transition: 'background .03s',
-                  background: active ? ACCENT : 'var(--empty)',
-                }
-              })
+              e('div', { key: i, onMouseDown: ev => { ev.preventDefault(); onPixelDown(i, active, ev.button === 2); }, onMouseEnter: () => onPixelEnter(i), onContextMenu: ev => ev.preventDefault(), style: { width: '100%', height: '100%', background: active ? ACCENT : 'var(--empty)', transition: 'background .03s' } })
             )
           ),
-          (showSpaceMarker && currentChar === ' ') && React.createElement('div', {
-            style: { position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 4 }
-          },
-            React.createElement('div', {
-              style: {
-                position: 'absolute', top: '2px', bottom: '2px', left: '50%',
-                width: '1px', transform: 'translateX(-50%)',
-                background: 'var(--border-accent)', opacity: .8
-              }
-            })
+          (showSpaceMarker && currentChar === ' ') && e('div', { style: { position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 4 } },
+            e('div', { style: { position: 'absolute', top: '2px', bottom: '2px', left: '50%', width: '1px', transform: 'translateX(-50%)', background: 'var(--border-accent)', opacity: .8 } })
           ),
-          React.createElement(GuideOverlay, {
-            gridSize,
-            xHeightGuideRow,
-            centerGuideCol,
-            showCenterGuide
-          })
-        ),
-
-        // preview moved to left sidebar below
+          e(GuideOverlay, { gridSize, xHeightGuideRow, centerGuideCol, showCenterGuide })
+        )
       ),
 
-      /* ── Characters panel ── */
-      React.createElement('aside', {
-        style: {
-          background: 'var(--surface)', border: '1px solid var(--border)',
-          borderRadius: R_CARD, padding: '18px', position: 'sticky', top: '68px',
-          boxShadow: 'var(--shadow-card)'
-        }
-      },
-        React.createElement('div', {
-          style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }
-        },
-          React.createElement(Label, { style: { fontSize: '8px', letterSpacing: '3px', color: 'var(--muted)' } }, 'CARACTERES'),
-          React.createElement('button', {
-            onClick: onClearCanvas,
-            style: {
-              background: 'rgba(191,69,69,0.07)', border: '1px solid rgba(191,69,69,0.18)',
-              borderRadius: R_BTN, padding: '5px 10px', color: ACCENT, fontSize: '9px',
-              fontFamily: FONT_MONO, cursor: 'pointer', letterSpacing: '1px'
-            }
-          }, 'LIMPIAR')
+      // ── PANEL DERECHO: Caracteres ─────────────
+      e('aside', { style: { background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: R_CARD, padding: '16px', position: 'sticky', top: '68px', boxShadow: 'var(--shadow-card)', display: 'flex', flexDirection: 'column', gap: '12px' } },
+        e('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' } },
+          e('span', { style: { fontFamily: FONT_MONO, fontSize: '8px', letterSpacing: '3px', color: 'var(--muted)' } }, 'CARACTERES'),
+          e('span', { style: { fontFamily: FONT_MONO, fontSize: '10px', color: 'var(--muted2)' } }, `${doneGlyphs}/${totalGlyphs}`)
         ),
 
-        React.createElement('div', {
-          style: {
-            display: 'flex', gap: '8px', marginBottom: '14px',
-            padding: '10px', background: 'var(--surface2)', borderRadius: R_BTN,
-            border: '1px solid var(--border)'
-          }
-        },
-          [
-            { val: Object.values(fontData).filter(g => g?.some(Boolean)).length, lbl: 'GLIFOS'  },
-            { val: gridSize,                                                      lbl: 'GRID PX' },
-            { val: grid.filter(Boolean).length,                                  lbl: 'PÍXELES' }
-          ].map(({ val, lbl }) =>
-            React.createElement('div', { key: lbl, style: { flex: 1, textAlign: 'center' } },
-              React.createElement('div', { style: { fontSize: '17px', fontWeight: '700', color: ACCENT, fontFamily: FONT_MONO } }, val),
-              React.createElement('div', { style: { fontSize: '7px', color: 'var(--muted)', letterSpacing: '2px', fontFamily: FONT_MONO, marginTop: '2px' } }, lbl)
-            )
+        // Búsqueda
+        e('div', { style: { position: 'relative' } },
+          e('input', { value: charSearch, onChange: ev => setCharSearch(ev.target.value), placeholder: 'Buscar carácter...', style: { width: '100%', padding: '8px 10px 8px 30px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: R_BTN, fontFamily: FONT_MONO, fontSize: '10px', color: 'var(--text)', outline: 'none', transition: 'border-color .15s' }, onFocus: ev => ev.target.style.borderColor = ACCENT, onBlur: ev => ev.target.style.borderColor = 'var(--border)' }),
+          e('span', { style: { position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', fontFamily: FONT_MONO, fontSize: '11px', color: 'var(--muted2)', pointerEvents: 'none' } }, '⌕')
+        ),
+
+        // Filtros
+        e('div', { style: { display: 'flex', gap: '4px' } },
+          [{ id: 'all', label: 'Todos' }, { id: 'done', label: 'Listos' }, { id: 'empty', label: 'Vacíos' }].map(({ id, label }) =>
+            e('button', { key: id, onClick: () => setCharFilter(id), style: { flex: 1, padding: '5px 6px', borderRadius: R_BTN, cursor: 'pointer', fontFamily: FONT_MONO, fontSize: '8px', background: charFilter === id ? ACCENT : 'var(--surface2)', color: charFilter === id ? '#fff' : 'var(--muted)', border: charFilter === id ? 'none' : '1px solid var(--border)', transition: 'all .13s' } }, label)
           )
         ),
 
-        React.createElement('div', {
-          style: {
-            display: 'grid', gridTemplateColumns: 'repeat(6,1fr)', gap: '4px',
-            maxHeight: '58vh', overflowY: 'auto', paddingRight: '2px'
-          }
-        },
-          TECLADO.map(t => {
-            const configured = fontData?.[t]?.some(Boolean);
-            const isActive   = currentChar === t;
-            return React.createElement('button', {
-              key: t, onClick: () => onSwitchChar(t), title: t,
-              style: {
-                height: '46px', borderRadius: R_BTN,
-                border: isActive ? 'none' : `1px solid ${configured ? 'rgba(191,69,69,0.22)' : 'var(--border)'}`,
-                background: isActive ? ACCENT : configured ? 'rgba(191,69,69,0.07)' : 'var(--surface2)',
-                color: isActive ? '#fff' : configured ? ACCENT : 'var(--muted)',
-                fontWeight: '700', fontSize: '13px', fontFamily: FONT_MONO, cursor: 'pointer',
-                position: 'relative',
-                boxShadow: isActive ? `0 3px 10px ${ACCENT}40` : 'none', transition: 'all .1s'
-              }
-            },
-              t === ' ' ? '·' : t,
-              (showSpaceMarker && t === ' ') && React.createElement('div', {
-                style: {
-                  position: 'absolute', top: '8px', bottom: '8px', left: '50%',
-                  width: '1px', transform: 'translateX(-50%)',
-                  background: isActive ? 'rgba(255,255,255,0.9)' : 'var(--border-accent)',
-                  opacity: .8
-                }
-              }),
-              configured && !isActive && React.createElement('div', {
-                style: {
-                  position: 'absolute', top: '4px', right: '4px',
-                  width: '4px', height: '4px', borderRadius: '50%', background: ACCENT
-                }
+        // Grilla de caracteres
+        filteredChars.length === 0
+          ? e('div', { style: { padding: '24px', textAlign: 'center', fontFamily: FONT_MONO, fontSize: '10px', color: 'var(--muted2)' } }, 'Sin resultados')
+          : e('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '4px', maxHeight: '52vh', overflowY: 'auto', paddingRight: '2px', scrollbarWidth: 'thin' } },
+              filteredChars.map(t => {
+                const configured = fontData?.[t]?.some(Boolean);
+                const isActive   = currentChar === t;
+                return e('button', { key: t, onClick: () => onSwitchChar(t), title: t === ' ' ? 'Espacio' : t, style: { height: '44px', borderRadius: R_BTN, cursor: 'pointer', border: isActive ? 'none' : `1px solid ${configured ? `${ACCENT}30` : 'var(--border)'}`, background: isActive ? ACCENT : configured ? `${ACCENT}08` : 'var(--surface2)', color: isActive ? '#fff' : configured ? ACCENT : 'var(--muted)', fontWeight: '700', fontSize: '13px', fontFamily: FONT_MONO, position: 'relative', boxShadow: isActive ? `0 3px 10px ${ACCENT}40` : 'none', transition: 'all .1s' } },
+                  t === ' ' ? '·' : t,
+                  (showSpaceMarker && t === ' ') && e('div', { style: { position: 'absolute', top: '8px', bottom: '8px', left: '50%', width: '1px', transform: 'translateX(-50%)', background: isActive ? 'rgba(255,255,255,0.9)' : 'var(--border-accent)', opacity: .8 } }),
+                  configured && !isActive && e('div', { style: { position: 'absolute', top: '4px', right: '4px', width: '4px', height: '4px', borderRadius: '50%', background: ACCENT } })
+                );
               })
-            );
-          })
-        )
+            )
       )
     ),
 
-    // Modals
-    showExport && React.createElement(ExportModal, {
-      projectName, fontData, gridSize,
-      previewText,
+    // ── MODALES ────────────────────────────────
+    showExport && e(ExportModal, {
+      projectName, fontData, gridSize, previewText,
       onClose: () => setShowExport(false),
       onExport: (filename, format, meta) => {
         try {
-          const safeFilename = (filename || projectName || 'mi-fuente').trim() || 'mi-fuente';
-          buildAndDownload(fontData, gridSize, safeFilename, format, meta);
+          const safe = (filename || projectName || 'mi-fuente').trim() || 'mi-fuente';
+          buildAndDownload(fontData, gridSize, safe, format, meta);
           setShowExport(false);
-        } catch (err) {
-          alert(err?.message || 'No se pudo exportar la fuente.');
-        }
+        } catch (err) { alert(err?.message || 'No se pudo exportar.'); }
       }
     }),
 
-    showPublish && React.createElement(PublishModal, {
-      projectName, fontData, gridSize,
-      showSpaceMarker,
+    showPublish && e(PublishModal, {
+      projectName, fontData, gridSize, showSpaceMarker,
       isPublishing, published: publishedOk,
-      onClose: () => { setShowPublish(false); onResetPublish && onResetPublish(); },
-      onPublish: (prevText) => onPublish && onPublish(prevText)
+      onClose: () => { setShowPublish(false); onResetPublish?.(); },
+      onPublish: (prevText) => onPublish?.(prevText)
     }),
 
-    showPrefs && React.createElement(PreferencesModal, {
+    showPrefs && e(PreferencesModal, {
       onClose: () => setShowPrefs(false),
-      showSpaceMarker,
-      setShowSpaceMarker,
-      showCenterGuide,
-      setShowCenterGuide,
-      centerGuideCol,
-      setCenterGuideCol,
-      xHeightGuideRow,
-      setXHeightGuideRow,
+      showSpaceMarker, setShowSpaceMarker,
+      showCenterGuide, setShowCenterGuide,
+      centerGuideCol, setCenterGuideCol,
+      xHeightGuideRow, setXHeightGuideRow,
       gridSize
     })
   );
