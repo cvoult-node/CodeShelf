@@ -335,7 +335,6 @@ export function EditorPage({
   const [openFileMenu,    setOpenFileMenu]    = useState(false);
   const [openUserMenu,    setOpenUserMenu]    = useState(false);
   const [avatarColor,     setAvatarColor]     = useState(ACCENT);
-  const [zoom,            setZoom]            = useState(100);
   const [charFilter,      setCharFilter]      = useState('all');
   const [charSearch,      setCharSearch]      = useState('');
   const [showSpaceMarker, setShowSpaceMarker] = useState(() => localStorage.getItem('cs-show-space-marker') !== '0');
@@ -345,7 +344,7 @@ export function EditorPage({
 
   const avatarInit = (user?.displayName || user?.email || '?')[0].toUpperCase();
   const CANVAS_BASE = 460;
-  const canvasSize = Math.round(CANVAS_BASE * zoom / 100);
+  const canvasSize = CANVAS_BASE;
 
   const totalGlyphs = TECLADO.length;
   const doneGlyphs  = TECLADO.filter(c => fontData?.[c]?.some(Boolean)).length;
@@ -389,9 +388,6 @@ export function EditorPage({
     const handler = (ev) => {
       if (['INPUT', 'TEXTAREA'].includes(ev.target.tagName)) return;
       const ctrl = ev.ctrlKey || ev.metaKey;
-      if (ctrl && (ev.key === '+' || ev.key === '=')) { ev.preventDefault(); setZoom(z => Math.min(200, z + 25)); return; }
-      if (ctrl && ev.key === '-') { ev.preventDefault(); setZoom(z => Math.max(50, z - 25)); return; }
-      if (ctrl && ev.key === '0') { ev.preventDefault(); setZoom(100); return; }
       if (ctrl && ev.key === 's') { ev.preventDefault(); onSave(); return; }
       if (ctrl && ev.key === 'z' && !ev.shiftKey) { ev.preventDefault(); onUndo(); return; }
       if (ctrl && (ev.key === 'y' || (ev.key === 'z' && ev.shiftKey))) { ev.preventDefault(); onRedo(); return; }
@@ -432,15 +428,15 @@ export function EditorPage({
     { id: 'mirror-v', iconName: 'mirror-v', label: 'ESP. V', tooltip: 'Espejo V (V)' },
   ];
   const actionTools = [
-    { iconName: 'arrow-left',  label: 'UNDO',  tooltip: 'Deshacer (Ctrl+Z)', fn: onUndo },
-    { iconName: 'arrow-right', label: 'REDO',  tooltip: 'Rehacer (Ctrl+Y)', fn: onRedo },
-    { iconName: 'invert',      label: 'INV',   tooltip: 'Invertir (Ctrl+I)', fn: onInvert },
-    { iconName: 'arrow-up',    label: '↑',     tooltip: 'Subir (↑)', fn: () => onShift('up') },
-    { iconName: 'arrow-down',  label: '↓',     tooltip: 'Bajar (↓)', fn: () => onShift('down') },
-    { iconName: 'mirror-h',    label: '←',     tooltip: 'Izquierda (←)', fn: () => onShift('left') },
-    { iconName: 'mirror-v',    label: '→',     tooltip: 'Derecha (→)', fn: () => onShift('right') },
+    { iconName: 'arrow-left',  tooltip: 'Deshacer (Ctrl+Z)', fn: onUndo },
+    { iconName: 'arrow-right', tooltip: 'Rehacer (Ctrl+Y)', fn: onRedo },
+    { iconName: 'invert',      tooltip: 'Invertir (Ctrl+I)', fn: onInvert },
+    { iconName: 'arrow-up',    tooltip: 'Subir (↑)', fn: () => onShift('up') },
+    { iconName: 'arrow-down',  tooltip: 'Bajar (↓)', fn: () => onShift('down') },
+    { iconName: 'mirror-h',    tooltip: 'Izquierda (←)', fn: () => onShift('left') },
+    { iconName: 'mirror-v',    tooltip: 'Derecha (→)', fn: () => onShift('right') },
   ];
-  const toolbarBase = { padding: '6px 7px', borderRadius: R_BTN, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', minWidth: '48px', fontFamily: FONT_MONO, border: 'none', transition: 'all .13s' };
+  const toolbarBase = { padding: '7px', borderRadius: R_BTN, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '3px', minWidth: '34px', fontFamily: FONT_MONO, border: 'none', transition: 'all .13s' };
 
   // ─────────────────────────────────────────────
   //  RENDER
@@ -490,9 +486,6 @@ export function EditorPage({
             e('span', { style: { fontFamily: FONT_MONO, fontSize: '9px', color: 'var(--muted)', letterSpacing: '1px' } }, `${progress}%`)
           )
         ),
-
-        // Zoom control
-        e(ZoomControl, { zoom, setZoom }),
 
         // Espacio marcador
         e(Tooltip, { label: showSpaceMarker ? 'Ocultar marcador' : 'Marcador de espacio', placement: 'bottom' },
@@ -571,20 +564,7 @@ export function EditorPage({
             e('div', { style: { width: `${progress}%`, height: '100%', background: ACCENT, borderRadius: '3px', transition: 'width .4s ease' } })
           )
         ),
-        // Acciones rápidas
-        e('div', { style: { display: 'flex', flexDirection: 'column', gap: '5px' } },
-          e('span', { style: { fontFamily: FONT_MONO, fontSize: '8px', letterSpacing: '2px', color: 'var(--muted2)' } }, 'ACCIONES RÁPIDAS'),
-          e('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '5px' } },
-            [
-              { label: '⬇ Exportar', fn: () => setShowExport(true), primary: true },
-              { label: '🌐 Publicar', fn: () => setShowPublish(true), primary: false },
-              { label: '⚙ Prefs',    fn: () => setShowPrefs(true),   primary: false },
-              { label: '💾 Guardar', fn: onSave,                     primary: false },
-            ].map(({ label, fn, primary }) =>
-              e('button', { key: label, onClick: fn, style: { padding: '8px 6px', borderRadius: R_BTN, cursor: 'pointer', fontFamily: FONT_MONO, fontSize: '9px', letterSpacing: '0.5px', background: primary ? ACCENT : 'var(--surface2)', color: primary ? '#fff' : 'var(--muted)', border: primary ? 'none' : '1px solid var(--border)', transition: 'all .13s', fontWeight: primary ? '700' : '400' } }, label)
-            )
-          )
-        )
+
       ),
 
       // ── CANVAS CENTRAL ───────────────────────
@@ -597,7 +577,6 @@ export function EditorPage({
             e('div', { style: { fontFamily: FONT_MONO, fontSize: '11px', color: 'var(--text)', letterSpacing: '1px' } }, `U+${(currentChar.codePointAt(0) || 0).toString(16).toUpperCase().padStart(4,'0')} · Grid ${gridSize}×${gridSize}`),
             (currentChar === ' ' && showSpaceMarker) && e('div', { style: { fontFamily: FONT_MONO, fontSize: '9px', color: 'var(--muted2)', letterSpacing: '1px', marginTop: '3px' } }, 'Marcador de espacio activo')
           ),
-          e(ZoomControl, { zoom, setZoom })
         ),
 
         // Toolbar
@@ -614,8 +593,7 @@ export function EditorPage({
           ...actionTools.map((t, i) =>
             e(Tooltip, { key: i, label: t.tooltip, placement: 'bottom' },
               e('button', { onClick: t.fn, style: { ...toolbarBase, background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--muted)' }, onMouseEnter: ev => { ev.currentTarget.style.background = 'var(--surface3)'; ev.currentTarget.style.borderColor = 'var(--border2)'; }, onMouseLeave: ev => { ev.currentTarget.style.background = 'var(--surface)'; ev.currentTarget.style.borderColor = 'var(--border)'; } },
-                e('img', { src: `./src/icons/${t.iconName}.svg`, style: { width: '16px', height: '16px', filter: 'var(--icon-filter)', opacity: .65 } }),
-                e('span', { style: { fontSize: '7px', letterSpacing: '0.5px' } }, t.label)
+                e('img', { src: `./src/icons/${t.iconName}.svg`, style: { width: '16px', height: '16px', filter: 'var(--icon-filter)', opacity: .65 } })
               )
             )
           ),
@@ -629,7 +607,7 @@ export function EditorPage({
         ),
 
         // Canvas de píxeles
-        e('div', { style: { position: 'relative', width: `${canvasSize}px`, height: `${canvasSize}px`, transition: 'width .2s ease, height .2s ease' } },
+        e('div', { style: { position: 'relative', width: `${canvasSize}px`, height: `${canvasSize}px` } },
           e('div', {
             style: { display: 'grid', gridTemplateColumns: `repeat(${gridSize}, 1fr)`, width: '100%', height: '100%', gap: '1px', background: 'var(--grid-line)', borderRadius: R_CARD, overflow: 'hidden', border: `2px solid var(--border-accent)`, cursor: 'crosshair', userSelect: 'none', boxShadow: `var(--shadow-card), 0 0 0 1px ${ACCENT}10` },
             onMouseUp: onMouseUp, onMouseLeave: onMouseUp
