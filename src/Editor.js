@@ -73,23 +73,17 @@ const Tooltip = ({ label, children, placement = 'bottom' }) => {
 };
 
 // ─────────────────────────────────────────────
-//  ZOOM CONTROL
-// ─────────────────────────────────────────────
-const ZoomControl = ({ zoom, setZoom }) =>
-  e('div', { style: { display: 'flex', alignItems: 'center', gap: '2px', background: 'var(--surface2)', borderRadius: R_BTN, border: '1px solid var(--border)', padding: '2px' } },
-    e('button', { onClick: () => setZoom(z => Math.max(50, z - 25)), style: { width: '24px', height: '24px', borderRadius: '5px', border: 'none', background: 'none', color: 'var(--muted)', cursor: 'pointer', fontFamily: FONT_MONO, fontSize: '14px', lineHeight: 1 } }, '−'),
-    e('span', { style: { fontFamily: FONT_MONO, fontSize: '9px', color: 'var(--text)', minWidth: '34px', textAlign: 'center', letterSpacing: '1px' } }, `${zoom}%`),
-    e('button', { onClick: () => setZoom(z => Math.min(200, z + 25)), style: { width: '24px', height: '24px', borderRadius: '5px', border: 'none', background: 'none', color: 'var(--muted)', cursor: 'pointer', fontFamily: FONT_MONO, fontSize: '14px', lineHeight: 1 } }, '+')
-  );
-
-// ─────────────────────────────────────────────
 //  GUIDE OVERLAY
 // ─────────────────────────────────────────────
-const GuideOverlay = ({ gridSize, xHeightGuideRow, centerGuideCol, showCenterGuide }) => {
+const GuideOverlay = ({ gridSize, xHeightGuideRow, centerGuideCol, showCenterGuide, capGuideRow, baselineGuideRow, descGuideRow, showGlyphGuides }) => {
+  if (!showGlyphGuides) return null;
+
   const lines = [];
-  const xHeightRow = clamp(xHeightGuideRow ?? Math.round(gridSize * 0.33), 0, gridSize - 1);
-  const baselineRow = getBaselineRow(gridSize);
-  const rowPct = (row) => (row / gridSize * 100).toFixed(4);
+  const xHeightRow  = clamp(xHeightGuideRow  ?? Math.round(gridSize * 0.33), 0, gridSize - 1);
+  const capRow      = clamp(capGuideRow       ?? 1,                           0, gridSize - 1);
+  const baselineRow = clamp(baselineGuideRow  ?? getBaselineRow(gridSize),    0, gridSize - 1);
+  const descRow     = clamp(descGuideRow      ?? gridSize - 1,                0, gridSize - 1);
+  const rowPct      = (row) => (row / gridSize * 100).toFixed(4);
 
   lines.push(e('rect', { key: 'desc-zone', x: '0', y: `${rowPct(baselineRow)}%`, width: '100%', height: `${(100 - Number(rowPct(baselineRow))).toFixed(4)}%`, fill: 'rgba(191,69,69,0.04)' }));
 
@@ -106,7 +100,13 @@ const GuideOverlay = ({ gridSize, xHeightGuideRow, centerGuideCol, showCenterGui
     ];
   };
 
-  lines.push(...guide('cap', 1, 'CAP', 0.45, '1.3'), ...guide('xh', xHeightRow, 'X-H', 0.40, '1.1', '3 3'), ...guide('base', baselineRow, 'BASE', 0.90, '1.8'), ...guide('desc', gridSize - 1, 'DESC', 0.35, '1.0', '2 2'));
+  lines.push(
+    ...guide('cap',  capRow,      'CAP',  0.45, '1.3'),
+    ...guide('xh',   xHeightRow,  'X-H',  0.40, '1.1', '3 3'),
+    ...guide('base', baselineRow, 'BASE', 0.90, '1.8'),
+    ...guide('desc', descRow,     'DESC', 0.35, '1.0', '2 2')
+  );
+
   return e('svg', { style: { position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 5 }, xmlns: 'http://www.w3.org/2000/svg' }, ...lines);
 };
 
@@ -114,16 +114,19 @@ const GuideOverlay = ({ gridSize, xHeightGuideRow, centerGuideCol, showCenterGui
 //  EXPORT MODAL
 // ─────────────────────────────────────────────
 const ExportModal = ({ projectName, fontData, gridSize, previewText: extText, onClose, onExport }) => {
-  const [filename, setFilename] = useState(projectName || 'mi-fuente');
-  const [fontName, setFontName] = useState(projectName || 'mi-fuente');
-  const [author, setAuthor] = useState('');
-  const [format, setFormat] = useState('otf');
+  const [filename,     setFilename]     = useState(projectName || 'mi-fuente');
+  const [fontName,     setFontName]     = useState(projectName || 'mi-fuente');
+  const [author,       setAuthor]       = useState('');
+  const [format,       setFormat]       = useState('otf');
   const [letterSpacing, setLetterSpacing] = useState(1);
-  const [wordSpacing, setWordSpacing] = useState(10);
+  const [wordSpacing,  setWordSpacing]  = useState(10);
   const [showAdvanced, setShowAdvanced] = useState(false);
+
+  // Standard metrics: scale so 1 grid pixel = unitsPerEm/gridSize units.
+  // Keep cap height spanning most of ascender to avoid tiny glyphs.
   const [unitsPerEm, setUnitsPerEm] = useState(1000);
-  const [ascender, setAscender] = useState(800);
-  const [descender, setDescender] = useState(-250);
+  const [ascender,   setAscender]   = useState(Math.round(1000 * (getBaselineRow(gridSize) / gridSize)));
+  const [descender,  setDescender]  = useState(-Math.round(1000 * ((gridSize - getBaselineRow(gridSize)) / gridSize)));
 
   const inputStyle = { background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: R_BTN, padding: '10px 13px', color: 'var(--text)', fontSize: '13px', outline: 'none', fontFamily: FONT_MONO, width: '100%', transition: 'border-color .15s' };
   const sliderStyle = { width: '100%', accentColor: ACCENT, cursor: 'pointer' };
@@ -167,7 +170,9 @@ const ExportModal = ({ projectName, fontData, gridSize, previewText: extText, on
               )
             )
           ),
-          e('p', { style: { fontFamily: FONT_MONO, fontSize: '9px', color: 'var(--muted2)', lineHeight: '1.6', margin: 0 } }, `Métrica para ${gridSize}×${gridSize}px. Baseline en fila ${getBaselineRow(gridSize)}.`)
+          e('p', { style: { fontFamily: FONT_MONO, fontSize: '9px', color: 'var(--muted2)', lineHeight: '1.6', margin: 0 } },
+            `Grid ${gridSize}×${gridSize} → ${Math.round(unitsPerEm / gridSize)} u/px. Baseline fila ${getBaselineRow(gridSize)}. Escala estándar automática.`
+          )
         )
       ),
       e('div', { style: { display: 'flex', flexDirection: 'column', gap: '8px' } },
@@ -224,12 +229,29 @@ const PublishModal = ({ projectName, fontData, gridSize, onClose, onPublish, isP
 // ─────────────────────────────────────────────
 //  PREFERENCES MODAL
 // ─────────────────────────────────────────────
-const PreferencesModal = ({ onClose, showSpaceMarker, setShowSpaceMarker, showCenterGuide, setShowCenterGuide, centerGuideCol, setCenterGuideCol, xHeightGuideRow, setXHeightGuideRow, gridSize }) => {
+const PreferencesModal = ({
+  onClose,
+  showSpaceMarker, setShowSpaceMarker,
+  showCenterGuide, setShowCenterGuide,
+  centerGuideCol,  setCenterGuideCol,
+  xHeightGuideRow, setXHeightGuideRow,
+  capGuideRow,     setCapGuideRow,
+  baselineGuideRow, setBaselineGuideRow,
+  descGuideRow,    setDescGuideRow,
+  showGlyphGuides, setShowGlyphGuides,
+  gridSize
+}) => {
   const [menu, setMenu] = useState('guides');
 
-  const MenuBtn = ({ id, label }) => e('button', { onClick: () => setMenu(id), style: { width: '100%', textAlign: 'left', padding: '9px 12px', background: menu === id ? `${ACCENT}12` : 'transparent', border: menu === id ? `1px solid ${ACCENT}30` : '1px solid transparent', borderRadius: R_BTN, color: menu === id ? 'var(--text)' : 'var(--muted)', fontFamily: FONT_MONO, fontSize: '10px', letterSpacing: '1px', cursor: 'pointer', transition: 'all .13s' } }, label);
+  const MenuBtn = ({ id, label }) => e('button', {
+    onClick: () => setMenu(id),
+    style: { width: '100%', textAlign: 'left', padding: '9px 12px', background: menu === id ? `${ACCENT}12` : 'transparent', border: menu === id ? `1px solid ${ACCENT}30` : '1px solid transparent', borderRadius: R_BTN, color: menu === id ? 'var(--text)' : 'var(--muted)', fontFamily: FONT_MONO, fontSize: '10px', letterSpacing: '1px', cursor: 'pointer', transition: 'all .13s' }
+  }, label);
 
-  const ToggleCard = ({ title, desc, val, setVal }) => e('button', { onClick: () => setVal(v => !v), style: { width: '100%', textAlign: 'left', background: val ? `${ACCENT}08` : 'var(--surface2)', border: val ? `1px solid ${ACCENT}30` : '1px solid var(--border)', borderRadius: R_BTN, padding: '12px 14px', cursor: 'pointer', transition: 'all .15s' } },
+  const ToggleCard = ({ title, desc, val, setVal }) => e('button', {
+    onClick: () => setVal(v => !v),
+    style: { width: '100%', textAlign: 'left', background: val ? `${ACCENT}08` : 'var(--surface2)', border: val ? `1px solid ${ACCENT}30` : '1px solid var(--border)', borderRadius: R_BTN, padding: '12px 14px', cursor: 'pointer', transition: 'all .15s' }
+  },
     e('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '5px' } },
       e('span', { style: { fontFamily: FONT_MONO, fontSize: '11px', color: 'var(--text)' } }, title),
       e('span', { style: { fontFamily: FONT_MONO, fontSize: '9px', letterSpacing: '1px', color: val ? ACCENT : 'var(--muted2)', background: val ? `${ACCENT}10` : 'var(--surface3)', padding: '2px 7px', borderRadius: '4px', border: val ? `1px solid ${ACCENT}30` : '1px solid transparent' } }, val ? 'ON' : 'OFF')
@@ -245,20 +267,6 @@ const PreferencesModal = ({ onClose, showSpaceMarker, setShowSpaceMarker, showCe
     e('input', { type: 'range', min, max, value, onChange, style: { width: '100%', accentColor: ACCENT, cursor: 'pointer' } })
   );
 
-  const previewSize = 16;
-  const GuidePreview = () => e('div', { style: { width: '160px', height: '160px', alignSelf: 'center', position: 'relative', border: '1px solid var(--border)', borderRadius: '10px', overflow: 'hidden', background: 'var(--surface2)' } },
-    e('div', { style: { position: 'absolute', inset: 0, display: 'grid', gridTemplateColumns: `repeat(${previewSize}, 1fr)`, gridTemplateRows: `repeat(${previewSize}, 1fr)`, gap: '1px', background: 'var(--grid-line)' } }, Array(previewSize * previewSize).fill(0).map((_, i) => e('div', { key: i, style: { background: 'var(--empty)' } }))),
-    e('div', { style: { position: 'absolute', left: 0, right: 0, top: `${(xHeightGuideRow / Math.max(1, gridSize)) * 100}%`, height: '2px', background: 'rgba(191,69,69,.65)' } }),
-    showCenterGuide && e('div', { style: { position: 'absolute', top: 0, bottom: 0, left: `${(centerGuideCol / Math.max(1, gridSize)) * 100}%`, width: '2px', background: 'rgba(191,69,69,.8)' } })
-  );
-
-  const SHORTCUTS = [
-    ['P', 'Herramienta Lápiz'], ['F', 'Herramienta Relleno'], ['H', 'Espejo horizontal'], ['V', 'Espejo vertical'],
-    ['Ctrl+S', 'Guardar proyecto'], ['Ctrl+Z', 'Deshacer'], ['Ctrl+Y / Ctrl+Shift+Z', 'Rehacer'], ['Ctrl+I', 'Invertir glifo'],
-    ['← → ↑ ↓', 'Desplazar glifo'], ['Ctrl + +', 'Zoom +'], ['Ctrl + −', 'Zoom −'], ['Ctrl + 0', 'Reset zoom'],
-    ['Delete', 'Limpiar glifo'], ['Escape', 'Cerrar modal'],
-  ];
-
   return e(Overlay, { onClose },
     e(Modal, { style: { maxWidth: '700px', width: '700px', gap: '16px' } },
       e('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' } },
@@ -269,31 +277,75 @@ const PreferencesModal = ({ onClose, showSpaceMarker, setShowSpaceMarker, showCe
         e('aside', { style: { border: '1px solid var(--border)', borderRadius: R_BTN, background: 'var(--surface2)', padding: '8px', display: 'flex', flexDirection: 'column', gap: '4px' } },
           e('div', { style: { fontFamily: FONT_MONO, fontSize: '8px', color: 'var(--muted2)', letterSpacing: '2px', padding: '4px 6px 8px' } }, 'SECCIÓN'),
           e(MenuBtn, { id: 'guides', label: 'Guías' }),
-          e(MenuBtn, { id: 'view', label: 'Vista' }),
-          e(MenuBtn, { id: 'shortcuts', label: 'Atajos' })
+          e(MenuBtn, { id: 'view',   label: 'Vista'  })
         ),
         e('section', { style: { border: '1px solid var(--border)', borderRadius: R_BTN, background: 'var(--surface)', padding: '16px', display: 'flex', flexDirection: 'column', gap: '14px', overflowY: 'auto' } },
+
+          // ── GUÍAS ──────────────────────────
           menu === 'guides' && e(React.Fragment, null,
-            e(ToggleCard, { title: 'Guía vertical editable', desc: 'Muestra una línea vertical configurable para marcar el ancho del glifo.', val: showCenterGuide, setVal: setShowCenterGuide }),
-            e('div', { style: { background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: R_BTN, padding: '12px', display: 'flex', flexDirection: 'column', gap: '12px' } },
-              e(SliderInput, { label: `X-Height (fila ${xHeightGuideRow})`, value: xHeightGuideRow, onChange: ev => setXHeightGuideRow(Number(ev.target.value)), min: 0, max: Math.max(0, gridSize - 1) }),
-              e(SliderInput, { label: `Guía vertical (col ${centerGuideCol})`, value: centerGuideCol, onChange: ev => setCenterGuideCol(Number(ev.target.value)), min: 0, max: Math.max(0, gridSize - 1) })
-            ),
-            e(GuidePreview)
+
+            // Toggle: mostrar guías de glifos
+            e(ToggleCard, {
+              title: 'Mostrar guías de glifos',
+              desc: 'Muestra las líneas de referencia CAP, X-H, BASE y DESC sobre el lienzo.',
+              val: showGlyphGuides,
+              setVal: setShowGlyphGuides
+            }),
+
+            // Toggle: guía vertical central
+            e(ToggleCard, {
+              title: 'Guía vertical central',
+              desc: 'Muestra una línea vertical configurable para marcar el ancho del glifo.',
+              val: showCenterGuide,
+              setVal: setShowCenterGuide
+            }),
+
+            // Sliders de posición
+            e('div', { style: { background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: R_BTN, padding: '14px', display: 'flex', flexDirection: 'column', gap: '14px' } },
+              e('div', { style: { fontFamily: FONT_MONO, fontSize: '8px', color: 'var(--muted2)', letterSpacing: '2px', marginBottom: '2px' } }, 'POSICIÓN DE GUÍAS'),
+
+              e(SliderInput, {
+                label: `CAP (fila ${capGuideRow})`,
+                value: capGuideRow,
+                onChange: ev => setCapGuideRow(Number(ev.target.value)),
+                min: 0, max: Math.max(0, gridSize - 1)
+              }),
+              e(SliderInput, {
+                label: `X-Height (fila ${xHeightGuideRow})`,
+                value: xHeightGuideRow,
+                onChange: ev => setXHeightGuideRow(Number(ev.target.value)),
+                min: 0, max: Math.max(0, gridSize - 1)
+              }),
+              e(SliderInput, {
+                label: `Baseline (fila ${baselineGuideRow})`,
+                value: baselineGuideRow,
+                onChange: ev => setBaselineGuideRow(Number(ev.target.value)),
+                min: 0, max: Math.max(0, gridSize - 1)
+              }),
+              e(SliderInput, {
+                label: `Descender (fila ${descGuideRow})`,
+                value: descGuideRow,
+                onChange: ev => setDescGuideRow(Number(ev.target.value)),
+                min: 0, max: Math.max(0, gridSize - 1)
+              }),
+              e(SliderInput, {
+                label: `Guía vertical (col ${centerGuideCol})`,
+                value: centerGuideCol,
+                onChange: ev => setCenterGuideCol(Number(ev.target.value)),
+                min: 0, max: Math.max(0, gridSize - 1)
+              })
+            )
           ),
+
+          // ── VISTA ──────────────────────────
           menu === 'view' && e(React.Fragment, null,
             e('p', { style: { margin: 0, fontFamily: FONT_MONO, fontSize: '10px', color: 'var(--muted)', lineHeight: '1.6' } }, 'Ajustes visuales del editor.'),
-            e(ToggleCard, { title: 'Marcador del espacio', desc: 'Muestra una referencia visual en el carácter espacio para diferenciarlo de celdas vacías.', val: showSpaceMarker, setVal: setShowSpaceMarker }),
-            e(GuidePreview)
-          ),
-          menu === 'shortcuts' && e(React.Fragment, null,
-            e('p', { style: { margin: 0, fontFamily: FONT_MONO, fontSize: '10px', color: 'var(--muted)', lineHeight: '1.6' } }, 'Atajos de teclado disponibles en el editor.'),
-            e('div', { style: { display: 'flex', flexDirection: 'column', gap: '4px' } },
-              SHORTCUTS.map(([key, desc]) => e('div', { key, style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '7px 10px', borderRadius: R_BTN, background: 'var(--surface2)', border: '1px solid var(--border)' } },
-                e('kbd', { style: { fontFamily: FONT_MONO, fontSize: '9px', color: ACCENT, background: `${ACCENT}10`, border: `1px solid ${ACCENT}25`, borderRadius: '4px', padding: '2px 6px' } }, key),
-                e('span', { style: { fontFamily: FONT_MONO, fontSize: '10px', color: 'var(--muted)' } }, desc)
-              ))
-            )
+            e(ToggleCard, {
+              title: 'Marcador del espacio',
+              desc: 'Muestra una referencia visual en el carácter espacio para diferenciarlo de celdas vacías.',
+              val: showSpaceMarker,
+              setVal: setShowSpaceMarker
+            })
           )
         )
       ),
@@ -319,21 +371,29 @@ export function EditorPage({
   const [openFileMenu,    setOpenFileMenu]    = useState(false);
   const [openUserMenu,    setOpenUserMenu]    = useState(false);
   const [avatarColor,     setAvatarColor]     = useState(ACCENT);
-  const [zoom,            setZoom]            = useState(100);
+
+  // Zoom: state & keyboard only, no visible buttons
+  const [zoom, setZoom] = useState(100);
+
   const [charFilter,      setCharFilter]      = useState('all');
   const [charSearch,      setCharSearch]      = useState('');
-  const [showSpaceMarker, setShowSpaceMarker] = useState(() => localStorage.getItem('cs-show-space-marker') !== '0');
-  const [showCenterGuide, setShowCenterGuide] = useState(() => localStorage.getItem('cs-show-center-guide') !== '0');
-  const [centerGuideCol,  setCenterGuideCol]  = useState(() => Number(localStorage.getItem('cs-center-guide-col') ?? 2));
-  const [xHeightGuideRow, setXHeightGuideRow] = useState(() => Number(localStorage.getItem('cs-xheight-guide-row') ?? Math.round(gridSize * 0.33)));
+
+  // ── Editor settings ─────────────────────────
+  const [showSpaceMarker,  setShowSpaceMarker]  = useState(() => localStorage.getItem('cs-show-space-marker') !== '0');
+  const [showCenterGuide,  setShowCenterGuide]  = useState(() => localStorage.getItem('cs-show-center-guide') !== '0');
+  const [showGlyphGuides,  setShowGlyphGuides]  = useState(() => localStorage.getItem('cs-show-glyph-guides') !== '0');
+  const [centerGuideCol,   setCenterGuideCol]   = useState(() => Number(localStorage.getItem('cs-center-guide-col') ?? 2));
+  const [xHeightGuideRow,  setXHeightGuideRow]  = useState(() => Number(localStorage.getItem('cs-xheight-guide-row') ?? Math.round(gridSize * 0.33)));
+  const [capGuideRow,      setCapGuideRow]      = useState(() => Number(localStorage.getItem('cs-cap-guide-row')     ?? 1));
+  const [baselineGuideRow, setBaselineGuideRow] = useState(() => Number(localStorage.getItem('cs-baseline-guide-row') ?? getBaselineRow(gridSize)));
+  const [descGuideRow,     setDescGuideRow]     = useState(() => Number(localStorage.getItem('cs-desc-guide-row')    ?? gridSize - 1));
 
   const avatarInit = (user?.displayName || user?.email || '?')[0].toUpperCase();
   const CANVAS_BASE = 460;
-  const canvasSize = Math.round(CANVAS_BASE * zoom / 100);
+  const canvasSize  = Math.round(CANVAS_BASE * zoom / 100);
 
   const totalGlyphs = TECLADO.length;
   const doneGlyphs  = TECLADO.filter(c => fontData?.[c]?.some(Boolean)).length;
-  const progress    = Math.round((doneGlyphs / totalGlyphs) * 100);
 
   // Avatar color desde Firestore
   useEffect(() => {
@@ -347,7 +407,7 @@ export function EditorPage({
     });
   }, [user]);
 
-  // Cerrar menús
+  // Cerrar menús al click fuera
   useEffect(() => {
     const close = () => { setOpenFileMenu(false); setOpenUserMenu(false); };
     if (openFileMenu || openUserMenu) window.addEventListener('click', close);
@@ -356,17 +416,38 @@ export function EditorPage({
 
   // Persistir ajustes
   useEffect(() => { writeSetting(EDITOR_STORAGE_KEYS.showSpaceMarker, showSpaceMarker ? '1' : '0'); }, [showSpaceMarker]);
-  useEffect(() => { localStorage.setItem('cs-show-center-guide', showCenterGuide ? '1' : '0'); }, [showCenterGuide]);
+  useEffect(() => { localStorage.setItem('cs-show-center-guide',  showCenterGuide  ? '1' : '0'); }, [showCenterGuide]);
+  useEffect(() => { localStorage.setItem('cs-show-glyph-guides',  showGlyphGuides  ? '1' : '0'); }, [showGlyphGuides]);
+
   useEffect(() => {
     const clamped = clamp(centerGuideCol || 0, 0, gridSize - 1);
     if (clamped !== centerGuideCol) setCenterGuideCol(clamped);
     localStorage.setItem('cs-center-guide-col', String(clamped));
   }, [centerGuideCol, gridSize]);
+
   useEffect(() => {
     const clamped = clamp(xHeightGuideRow || 0, 0, gridSize - 1);
     if (clamped !== xHeightGuideRow) setXHeightGuideRow(clamped);
     localStorage.setItem('cs-xheight-guide-row', String(clamped));
   }, [xHeightGuideRow, gridSize]);
+
+  useEffect(() => {
+    const clamped = clamp(capGuideRow || 0, 0, gridSize - 1);
+    if (clamped !== capGuideRow) setCapGuideRow(clamped);
+    localStorage.setItem('cs-cap-guide-row', String(clamped));
+  }, [capGuideRow, gridSize]);
+
+  useEffect(() => {
+    const clamped = clamp(baselineGuideRow || 0, 0, gridSize - 1);
+    if (clamped !== baselineGuideRow) setBaselineGuideRow(clamped);
+    localStorage.setItem('cs-baseline-guide-row', String(clamped));
+  }, [baselineGuideRow, gridSize]);
+
+  useEffect(() => {
+    const clamped = clamp(descGuideRow || 0, 0, gridSize - 1);
+    if (clamped !== descGuideRow) setDescGuideRow(clamped);
+    localStorage.setItem('cs-desc-guide-row', String(clamped));
+  }, [descGuideRow, gridSize]);
 
   // ── Keyboard shortcuts ────────────────────
   useEffect(() => {
@@ -374,20 +455,20 @@ export function EditorPage({
       if (['INPUT', 'TEXTAREA'].includes(ev.target.tagName)) return;
       const ctrl = ev.ctrlKey || ev.metaKey;
       if (ctrl && (ev.key === '+' || ev.key === '=')) { ev.preventDefault(); setZoom(z => Math.min(200, z + 25)); return; }
-      if (ctrl && ev.key === '-') { ev.preventDefault(); setZoom(z => Math.max(50, z - 25)); return; }
-      if (ctrl && ev.key === '0') { ev.preventDefault(); setZoom(100); return; }
-      if (ctrl && ev.key === 's') { ev.preventDefault(); onSave(); return; }
+      if (ctrl && ev.key === '-')  { ev.preventDefault(); setZoom(z => Math.max(50, z - 25)); return; }
+      if (ctrl && ev.key === '0')  { ev.preventDefault(); setZoom(100); return; }
+      if (ctrl && ev.key === 's')  { ev.preventDefault(); onSave();   return; }
       if (ctrl && ev.key === 'z' && !ev.shiftKey) { ev.preventDefault(); onUndo(); return; }
       if (ctrl && (ev.key === 'y' || (ev.key === 'z' && ev.shiftKey))) { ev.preventDefault(); onRedo(); return; }
-      if (ctrl && ev.key === 'i') { ev.preventDefault(); onInvert(); return; }
+      if (ctrl && ev.key === 'i')  { ev.preventDefault(); onInvert(); return; }
       if (!ctrl) {
-        if (ev.key === 'p') { setTool('pencil'); return; }
-        if (ev.key === 'f') { setTool('fill'); return; }
+        if (ev.key === 'p') { setTool('pencil');   return; }
+        if (ev.key === 'f') { setTool('fill');     return; }
         if (ev.key === 'h') { setTool('mirror-h'); return; }
         if (ev.key === 'v') { setTool('mirror-v'); return; }
-        if (ev.key === 'ArrowUp')    { ev.preventDefault(); onShift('up'); return; }
-        if (ev.key === 'ArrowDown')  { ev.preventDefault(); onShift('down'); return; }
-        if (ev.key === 'ArrowLeft')  { ev.preventDefault(); onShift('left'); return; }
+        if (ev.key === 'ArrowUp')    { ev.preventDefault(); onShift('up');    return; }
+        if (ev.key === 'ArrowDown')  { ev.preventDefault(); onShift('down');  return; }
+        if (ev.key === 'ArrowLeft')  { ev.preventDefault(); onShift('left');  return; }
         if (ev.key === 'ArrowRight') { ev.preventDefault(); onShift('right'); return; }
         if (ev.key === 'Delete' || ev.key === 'Backspace') { onClearCanvas(); return; }
       }
@@ -404,7 +485,7 @@ export function EditorPage({
   const filteredChars = useMemo(() => {
     let chars = TECLADO;
     if (charSearch) { const q = charSearch.toLowerCase(); chars = chars.filter(c => c.toLowerCase().includes(q)); }
-    if (charFilter === 'done')  chars = chars.filter(c => fontData?.[c]?.some(Boolean));
+    if (charFilter === 'done')  chars = chars.filter(c =>  fontData?.[c]?.some(Boolean));
     if (charFilter === 'empty') chars = chars.filter(c => !fontData?.[c]?.some(Boolean));
     return chars;
   }, [charSearch, charFilter, fontData]);
@@ -416,14 +497,15 @@ export function EditorPage({
     { id: 'mirror-v', iconName: 'mirror-v', label: 'ESP. V', tooltip: 'Espejo V (V)' },
   ];
   const actionTools = [
-    { iconName: 'arrow-left',  label: 'UNDO',  tooltip: 'Deshacer (Ctrl+Z)', fn: onUndo },
-    { iconName: 'arrow-right', label: 'REDO',  tooltip: 'Rehacer (Ctrl+Y)', fn: onRedo },
-    { iconName: 'invert',      label: 'INV',   tooltip: 'Invertir (Ctrl+I)', fn: onInvert },
-    { iconName: 'arrow-up',    label: '↑',     tooltip: 'Subir (↑)', fn: () => onShift('up') },
-    { iconName: 'arrow-down',  label: '↓',     tooltip: 'Bajar (↓)', fn: () => onShift('down') },
-    { iconName: 'mirror-h',    label: '←',     tooltip: 'Izquierda (←)', fn: () => onShift('left') },
-    { iconName: 'mirror-v',    label: '→',     tooltip: 'Derecha (→)', fn: () => onShift('right') },
+    { iconName: 'arrow-left',  label: 'UNDO', tooltip: 'Deshacer (Ctrl+Z)', fn: onUndo },
+    { iconName: 'arrow-right', label: 'REDO', tooltip: 'Rehacer (Ctrl+Y)', fn: onRedo },
+    { iconName: 'invert',      label: 'INV',  tooltip: 'Invertir (Ctrl+I)', fn: onInvert },
+    { iconName: 'arrow-up',    label: '↑',    tooltip: 'Subir (↑)',         fn: () => onShift('up') },
+    { iconName: 'arrow-down',  label: '↓',    tooltip: 'Bajar (↓)',         fn: () => onShift('down') },
+    { iconName: 'mirror-h',    label: '←',    tooltip: 'Izquierda (←)',     fn: () => onShift('left') },
+    { iconName: 'mirror-v',    label: '→',    tooltip: 'Derecha (→)',        fn: () => onShift('right') },
   ];
+
   const toolbarBase = { padding: '6px 7px', borderRadius: R_BTN, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', minWidth: '48px', fontFamily: FONT_MONO, border: 'none', transition: 'all .13s' };
 
   // ─────────────────────────────────────────────
@@ -433,6 +515,8 @@ export function EditorPage({
 
     // ── NAVBAR ──────────────────────────────────
     e('nav', { style: { height: '52px', padding: '0 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border)', background: 'var(--nav-bg)', backdropFilter: 'blur(16px)', position: 'sticky', top: 0, zIndex: 200 } },
+
+      // Izquierda: logo + menú archivo + nombre proyecto
       e('div', { style: { display: 'flex', alignItems: 'center', gap: '4px' } },
         e('span', { onClick: onBack, style: { fontFamily: FONT_PIXEL, fontSize: '11px', color: ACCENT, letterSpacing: '2px', cursor: 'pointer', padding: '6px 10px', borderRadius: R_BTN, transition: 'opacity .15s' } }, 'CODESHELF'),
 
@@ -441,11 +525,11 @@ export function EditorPage({
           e('button', { onClick: ev => { ev.stopPropagation(); setOpenFileMenu(v => !v); }, style: { fontFamily: FONT_MONO, fontSize: '9px', letterSpacing: '2px', color: openFileMenu ? 'var(--text)' : 'var(--muted)', padding: '6px 12px', borderRadius: R_BTN, background: openFileMenu ? 'var(--surface2)' : 'none', border: openFileMenu ? '1px solid var(--border)' : '1px solid transparent', cursor: 'pointer', transition: 'all .15s' } }, 'ARCHIVO'),
           openFileMenu && e('div', { onClick: ev => ev.stopPropagation(), style: { position: 'absolute', top: 'calc(100% + 8px)', left: 0, background: 'var(--surface)', border: '1px solid var(--border2)', borderRadius: '12px', minWidth: '230px', zIndex: 300, boxShadow: '0 20px 60px rgba(0,0,0,0.22)', overflow: 'hidden', padding: '6px' } },
             [
-              { icon: 'fonts',   label: 'Mis proyectos',     kbd: '',       fn: onBack },
-              { icon: 'save',    label: 'Guardar',           kbd: 'Ctrl+S', fn: onSave },
-              { icon: 'theme',   label: 'Preferencias',      kbd: '',       fn: () => { setShowPrefs(true); setOpenFileMenu(false); } },
-              { icon: 'export',  label: 'Exportar fuente',   kbd: '',       fn: () => { setShowExport(true); setOpenFileMenu(false); } },
-              { icon: 'publish', label: 'Publicar en galería', kbd: '',     fn: () => { setShowPublish(true); setOpenFileMenu(false); } },
+              { icon: 'fonts',   label: 'Mis proyectos',       kbd: '',       fn: onBack },
+              { icon: 'save',    label: 'Guardar',             kbd: 'Ctrl+S', fn: onSave },
+              { icon: 'theme',   label: 'Preferencias',        kbd: '',       fn: () => { setShowPrefs(true); setOpenFileMenu(false); } },
+              { icon: 'export',  label: 'Exportar fuente',     kbd: '',       fn: () => { setShowExport(true); setOpenFileMenu(false); } },
+              { icon: 'publish', label: 'Publicar en galería', kbd: '',       fn: () => { setShowPublish(true); setOpenFileMenu(false); } },
             ].map(({ icon, label, kbd, fn }) =>
               e('button', { key: label, onClick: () => { fn(); setOpenFileMenu(false); }, style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '9px 12px', background: 'none', border: '1px solid transparent', borderRadius: '8px', cursor: 'pointer', fontFamily: FONT_MONO, color: 'var(--muted)', textAlign: 'left', transition: 'all .12s' }, onMouseEnter: ev => { ev.currentTarget.style.background = 'var(--surface2)'; ev.currentTarget.style.borderColor = 'var(--border)'; ev.currentTarget.style.color = 'var(--text)'; }, onMouseLeave: ev => { ev.currentTarget.style.background = 'none'; ev.currentTarget.style.borderColor = 'transparent'; ev.currentTarget.style.color = 'var(--muted)'; } },
                 e('div', { style: { display: 'flex', alignItems: 'center', gap: '10px' } },
@@ -460,28 +544,22 @@ export function EditorPage({
         e('span', { style: { fontFamily: FONT_MONO, fontSize: '9px', letterSpacing: '2px', color: 'var(--muted2)', paddingLeft: '8px', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, projectName || '')
       ),
 
-      // Derecha del navbar
+      // Derecha: estado guardado + controles
       e('div', { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
-        // Estado de guardado
+
         isSaving && e('div', { style: { fontFamily: FONT_MONO, fontSize: '9px', letterSpacing: '1px', color: ACCENT, display: 'flex', alignItems: 'center', gap: '5px' } }, '◐ GUARDANDO'),
 
-        // Progreso
-        e(Tooltip, { label: `${doneGlyphs}/${totalGlyphs} glifos (${progress}%)`, placement: 'bottom' },
-          e('div', { style: { display: 'flex', alignItems: 'center', gap: '6px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: R_BTN, padding: '5px 10px', cursor: 'default' } },
-            e('div', { style: { width: '48px', height: '4px', background: 'var(--border)', borderRadius: '2px', overflow: 'hidden' } },
-              e('div', { style: { width: `${progress}%`, height: '100%', background: ACCENT, borderRadius: '2px', transition: 'width .3s ease' } })
-            ),
-            e('span', { style: { fontFamily: FONT_MONO, fontSize: '9px', color: 'var(--muted)', letterSpacing: '1px' } }, `${progress}%`)
-          )
-        ),
-
-        // Zoom control
-        e(ZoomControl, { zoom, setZoom }),
-
-        // Espacio marcador
+        // Marcador de espacio
         e(Tooltip, { label: showSpaceMarker ? 'Ocultar marcador' : 'Marcador de espacio', placement: 'bottom' },
           e('button', { onClick: () => setShowSpaceMarker(v => !v), style: { height: '32px', padding: '0 10px', borderRadius: R_BTN, background: showSpaceMarker ? ACCENT : 'var(--surface2)', border: showSpaceMarker ? 'none' : '1px solid var(--border)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontFamily: FONT_MONO, fontSize: '8px', letterSpacing: '1px', color: showSpaceMarker ? '#fff' : 'var(--muted)', transition: 'all .15s' } },
             e('span', { style: { fontSize: '12px', lineHeight: 1 } }, '␠'), 'ESPACIO'
+          )
+        ),
+
+        // Guías de glifos toggle rápido
+        e(Tooltip, { label: showGlyphGuides ? 'Ocultar guías' : 'Mostrar guías', placement: 'bottom' },
+          e('button', { onClick: () => setShowGlyphGuides(v => !v), style: { height: '32px', padding: '0 10px', borderRadius: R_BTN, background: showGlyphGuides ? ACCENT : 'var(--surface2)', border: showGlyphGuides ? 'none' : '1px solid var(--border)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontFamily: FONT_MONO, fontSize: '8px', letterSpacing: '1px', color: showGlyphGuides ? '#fff' : 'var(--muted)', transition: 'all .15s' } },
+            e('span', { style: { fontSize: '10px', lineHeight: 1 } }, '⊞'), 'GUÍAS'
           )
         ),
 
@@ -521,46 +599,38 @@ export function EditorPage({
 
       // ── PANEL IZQUIERDO ──────────────────────
       e('aside', { style: { background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', padding: '16px', position: 'sticky', top: '68px', boxShadow: 'var(--shadow-card)', display: 'flex', flexDirection: 'column', gap: '12px' } },
+
+        // Preview de texto — usa PixelPreview para indexación correcta
         e('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' } },
           e('span', { style: { fontFamily: FONT_MONO, fontSize: '8px', letterSpacing: '3px', color: 'var(--muted)' } }, 'PREVIEW'),
           e('input', { value: previewText, onChange: ev => setPreviewText(ev.target.value), placeholder: 'texto...', style: { background: 'none', border: 'none', outline: 'none', color: 'var(--muted2)', fontSize: '10px', fontFamily: FONT_MONO, textAlign: 'right', width: '100px' } })
         ),
-        e('div', { style: { background: 'var(--canvas-bg)', borderRadius: '8px', padding: '8px', height: '56px', overflowX: 'auto', overflowY: 'hidden', display: 'flex', alignItems: 'center', whiteSpace: 'nowrap', scrollbarWidth: 'thin', border: '1px solid var(--border)' } },
-          e('div', { style: { display: 'flex', gap: '0px', alignItems: 'center', flexShrink: 0 } },
-            previewText.split('').map((ch, ci) => {
-              const glyph = fontData[ch]; const sz = Math.min(gridSize, 14), px = 2; const isSpace = ch === ' ';
-              return e('div', { key: ci, style: { display: 'grid', gridTemplateColumns: `repeat(${sz},${px}px)`, marginRight: '1px', flexShrink: 0, border: (isSpace && showSpaceMarker) ? '1px dashed var(--border)' : 'none', borderRadius: '2px', minWidth: isSpace ? `${sz * px}px` : undefined } },
-                isSpace ? null : Array(sz * sz).fill(0).map((_, pi) => e('div', { key: pi, style: { width: `${px}px`, height: `${px}px`, background: glyph?.[pi] ? ACCENT : 'transparent' } }))
-              );
-            })
-          )
+        e('div', { style: { background: 'var(--canvas-bg)', borderRadius: '8px', height: '56px', overflowX: 'auto', overflowY: 'hidden', display: 'flex', alignItems: 'center', border: '1px solid var(--border)', scrollbarWidth: 'thin' } },
+          e(PixelPreview, { text: previewText || ' ', fontData, gridSize, pixelSize: 2, color: ACCENT, showSpaceMarker })
         ),
+
         e('div', { style: { height: '1px', background: 'var(--border)' } }),
+
         // Stats
         e('div', { style: { display: 'flex', gap: '6px' } },
-          [{ val: doneGlyphs, lbl: 'GLIFOS' }, { val: gridSize, lbl: 'GRID' }, { val: grid.filter(Boolean).length, lbl: 'PX' }].map(({ val, lbl }) =>
+          [
+            { val: doneGlyphs,              lbl: 'GLIFOS' },
+            { val: gridSize,                lbl: 'GRID'   },
+            { val: grid.filter(Boolean).length, lbl: 'PX' },
+          ].map(({ val, lbl }) =>
             e('div', { key: lbl, style: { flex: 1, textAlign: 'center', padding: '8px 4px', background: 'var(--surface2)', borderRadius: R_BTN, border: '1px solid var(--border)' } },
               e('div', { style: { fontSize: '16px', fontWeight: '700', color: ACCENT, fontFamily: FONT_MONO } }, val),
               e('div', { style: { fontSize: '7px', color: 'var(--muted)', letterSpacing: '2px', fontFamily: FONT_MONO, marginTop: '2px' } }, lbl)
             )
           )
         ),
-        // Barra progreso
-        e('div', { style: { display: 'flex', flexDirection: 'column', gap: '5px' } },
-          e('div', { style: { display: 'flex', justifyContent: 'space-between' } },
-            e('span', { style: { fontFamily: FONT_MONO, fontSize: '8px', color: 'var(--muted)', letterSpacing: '1px' } }, 'PROGRESO'),
-            e('span', { style: { fontFamily: FONT_MONO, fontSize: '8px', color: ACCENT } }, `${progress}%`)
-          ),
-          e('div', { style: { height: '5px', background: 'var(--border)', borderRadius: '3px', overflow: 'hidden' } },
-            e('div', { style: { width: `${progress}%`, height: '100%', background: ACCENT, borderRadius: '3px', transition: 'width .4s ease' } })
-          )
-        ),
+
         // Acciones rápidas
         e('div', { style: { display: 'flex', flexDirection: 'column', gap: '5px' } },
           e('span', { style: { fontFamily: FONT_MONO, fontSize: '8px', letterSpacing: '2px', color: 'var(--muted2)' } }, 'ACCIONES RÁPIDAS'),
           e('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '5px' } },
             [
-              { label: '⬇ Exportar', fn: () => setShowExport(true), primary: true },
+              { label: '⬇ Exportar', fn: () => setShowExport(true),  primary: true  },
               { label: '🌐 Publicar', fn: () => setShowPublish(true), primary: false },
               { label: '⚙ Prefs',    fn: () => setShowPrefs(true),   primary: false },
               { label: '💾 Guardar', fn: onSave,                     primary: false },
@@ -573,15 +643,15 @@ export function EditorPage({
 
       // ── CANVAS CENTRAL ───────────────────────
       e('section', { style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '14px', background: 'var(--surface)', borderRadius: R_CARD, border: '1px solid var(--border)', padding: '20px', boxShadow: 'var(--shadow-card)' } },
+
         // Carácter activo
         e('div', { style: { display: 'flex', alignItems: 'center', gap: '16px', width: '100%' } },
           e('div', { style: { fontFamily: FONT_PIXEL, fontSize: '36px', lineHeight: 1, color: ACCENT, minWidth: '52px', textAlign: 'center', textShadow: `0 0 20px ${ACCENT}40` } }, currentChar === ' ' ? '·' : currentChar),
           e('div', { style: { flex: 1 } },
             e('div', { style: { fontFamily: FONT_MONO, fontSize: '9px', color: 'var(--muted)', letterSpacing: '2px', marginBottom: '4px' } }, 'EDITANDO CARÁCTER'),
-            e('div', { style: { fontFamily: FONT_MONO, fontSize: '11px', color: 'var(--text)', letterSpacing: '1px' } }, `U+${(currentChar.codePointAt(0) || 0).toString(16).toUpperCase().padStart(4,'0')} · Grid ${gridSize}×${gridSize}`),
+            e('div', { style: { fontFamily: FONT_MONO, fontSize: '11px', color: 'var(--text)', letterSpacing: '1px' } }, `U+${(currentChar.codePointAt(0) || 0).toString(16).toUpperCase().padStart(4, '0')} · Grid ${gridSize}×${gridSize}`),
             (currentChar === ' ' && showSpaceMarker) && e('div', { style: { fontFamily: FONT_MONO, fontSize: '9px', color: 'var(--muted2)', letterSpacing: '1px', marginTop: '3px' } }, 'Marcador de espacio activo')
-          ),
-          e(ZoomControl, { zoom, setZoom })
+          )
         ),
 
         // Toolbar
@@ -625,7 +695,12 @@ export function EditorPage({
           (showSpaceMarker && currentChar === ' ') && e('div', { style: { position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 4 } },
             e('div', { style: { position: 'absolute', top: '2px', bottom: '2px', left: '50%', width: '1px', transform: 'translateX(-50%)', background: 'var(--border-accent)', opacity: .8 } })
           ),
-          e(GuideOverlay, { gridSize, xHeightGuideRow, centerGuideCol, showCenterGuide })
+          e(GuideOverlay, {
+            gridSize,
+            xHeightGuideRow, centerGuideCol, showCenterGuide,
+            capGuideRow, baselineGuideRow, descGuideRow,
+            showGlyphGuides
+          })
         )
       ),
 
@@ -688,10 +763,14 @@ export function EditorPage({
 
     showPrefs && e(PreferencesModal, {
       onClose: () => setShowPrefs(false),
-      showSpaceMarker, setShowSpaceMarker,
-      showCenterGuide, setShowCenterGuide,
-      centerGuideCol, setCenterGuideCol,
-      xHeightGuideRow, setXHeightGuideRow,
+      showSpaceMarker,  setShowSpaceMarker,
+      showCenterGuide,  setShowCenterGuide,
+      centerGuideCol,   setCenterGuideCol,
+      xHeightGuideRow,  setXHeightGuideRow,
+      capGuideRow,      setCapGuideRow,
+      baselineGuideRow, setBaselineGuideRow,
+      descGuideRow,     setDescGuideRow,
+      showGlyphGuides,  setShowGlyphGuides,
       gridSize
     })
   );
