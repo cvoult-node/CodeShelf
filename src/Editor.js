@@ -32,9 +32,11 @@ if (!document.getElementById('cs-pixel-font-style')) {
 // ─────────────────────────────────────────────
 //  PIXEL PREVIEW
 // ─────────────────────────────────────────────
-const PixelPreview = ({ text, fontData, gridSize, pixelSize = 3, color = ACCENT, showSpaceMarker = false, letterSpacing = 0, wordSpacing = 10 }) => {
+const PixelPreview = ({ text, fontData, gridSize, pixelSize = 3, color = ACCENT, showSpaceMarker = false, letterSpacing = 0, wordSpacing = 10, baselineRow }) => {
   const chars = text.split('');
   const sz = Math.min(gridSize, 32);
+  // baseline row: use prop if provided, otherwise fall back to 75% of grid
+  const blRow = (baselineRow != null) ? Math.min(baselineRow, sz - 1) : Math.round(sz * 0.75);
 
   const getBounds = (glyph) => {
     if (!Array.isArray(glyph)) return null;
@@ -51,7 +53,8 @@ const PixelPreview = ({ text, fontData, gridSize, pixelSize = 3, color = ACCENT,
   // Compute reference size from the largest drawn glyph
   const allBounds = Object.values(fontData).map(g => getBounds(g)).filter(Boolean);
   const refCols = allBounds.length > 0 ? Math.max(...allBounds.map(b => b.maxCol - b.minCol + 1)) : sz;
-  const refRows = allBounds.length > 0 ? Math.max(...allBounds.map(b => b.maxRow - b.minRow + 1)) : sz;
+  // reference height = rows from top of grid to baseline (what drawn glyphs occupy above baseline)
+  const refRows = blRow;
 
   return e('div', { style: { display: 'flex', flexWrap: 'nowrap', overflowX: 'auto', overflowY: 'hidden', whiteSpace: 'nowrap', padding: '8px', minHeight: '28px', alignItems: 'flex-end', scrollbarWidth: 'thin' } },
     chars.map((ch, ci) => {
@@ -63,7 +66,8 @@ const PixelPreview = ({ text, fontData, gridSize, pixelSize = 3, color = ACCENT,
       const computedSpaceWidth = Math.max(minSpaceWidth, pixelSize * 3 + wordSpacing * 0.2);
       const hasDrawing = bounds !== null && !isSpace;
 
-      // If undrawn: use reference size and show placeholder box
+      // drawn glyph: use full grid height for pixel grid (preserves baseline alignment)
+      // empty glyph: use refCols × refRows (above-baseline portion only)
       const glyphCols = hasDrawing ? (bounds.maxCol - bounds.minCol + 1) : (isSpace ? 1 : refCols);
       const glyphRows = hasDrawing ? sz : (isSpace ? 1 : refRows);
 
@@ -77,9 +81,11 @@ const PixelPreview = ({ text, fontData, gridSize, pixelSize = 3, color = ACCENT,
           height: `${glyphRows * pixelSize}px`,
           minWidth: isSpace ? `${minSpaceWidth}px` : undefined,
           marginRight: `${spacingPx}px`,
-          border: (!hasDrawing && !isSpace) ? `1px dashed rgba(255,255,255,0.15)` : (isSpace && showSpaceMarker) ? '1px dashed var(--border)' : 'none',
-          borderRadius: '2px', padding: (isSpace && showSpaceMarker) ? '2px' : 0, flexShrink: 0, alignSelf: 'flex-end',
-          position: 'relative', background: (!hasDrawing && !isSpace) ? 'rgba(255,255,255,0.03)' : 'transparent'
+          border: (!hasDrawing && !isSpace) ? `1px dashed rgba(255,255,255,0.18)` : (isSpace && showSpaceMarker) ? '1px dashed var(--border)' : 'none',
+          borderRadius: '2px', padding: (isSpace && showSpaceMarker) ? '2px' : 0, flexShrink: 0,
+          // align drawn glyphs and empty placeholders both to baseline bottom
+          alignSelf: 'flex-end',
+          position: 'relative', background: (!hasDrawing && !isSpace) ? 'rgba(255,255,255,0.04)' : 'transparent'
         }
       },
         hasDrawing
@@ -91,7 +97,7 @@ const PixelPreview = ({ text, fontData, gridSize, pixelSize = 3, color = ACCENT,
             })
           : isSpace
             ? null
-            : e('span', { style: { fontFamily: FONT_MONO, fontSize: `${Math.max(8, pixelSize * 2)}px`, color: 'rgba(255,255,255,0.2)', userSelect: 'none', lineHeight: 1 } }, ch),
+            : e('span', { style: { fontFamily: FONT_MONO, fontSize: `${Math.max(7, pixelSize * 2)}px`, color: 'rgba(255,255,255,0.22)', userSelect: 'none', lineHeight: 1 } }, ch),
         (isSpace && showSpaceMarker) && e('div', { style: { position: 'absolute', top: '2px', bottom: '2px', left: '50%', width: '1px', transform: 'translateX(-50%)', background: 'var(--border-accent)', opacity: .65, pointerEvents: 'none' } })
       );
     })
@@ -193,7 +199,7 @@ const ExportModal = ({ projectName, fontData, gridSize, previewText: extText, on
       ),
       e('div', { style: { background: 'var(--surface2)', border: '1px solid var(--border2)', borderRadius: R_BTN, padding: '14px', minHeight: '100px' } },
         e('div', { style: { fontFamily: FONT_MONO, fontSize: '8px', color: 'var(--muted2)', letterSpacing: '2px', marginBottom: '10px' } }, 'PREVIEW'),
-        e(PixelPreview, { text: extText || 'Lorem ipsum', fontData, gridSize, pixelSize: 4, color: ACCENT, letterSpacing, wordSpacing })
+        e(PixelPreview, { text: extText || 'Lorem ipsum', fontData, gridSize, pixelSize: 4, color: ACCENT, letterSpacing, wordSpacing, baselineRow: getBaselineRow(gridSize) })
       ),
       e(Field, { label: 'NOMBRE DEL ARCHIVO' }, e('input', { value: filename, onChange: ev => setFilename(ev.target.value), style: inputStyle, onFocus: ev => ev.target.style.borderColor = ACCENT, onBlur: ev => ev.target.style.borderColor = 'var(--border)' })),
       e(Field, { label: 'NOMBRE DE LA FAMILIA' }, e('input', { value: fontName, onChange: ev => setFontName(ev.target.value), style: inputStyle, onFocus: ev => ev.target.style.borderColor = ACCENT, onBlur: ev => ev.target.style.borderColor = 'var(--border)' })),
@@ -267,7 +273,7 @@ const PublishModal = ({ projectName, fontData, gridSize, onClose, onPublish, isP
           e('span', { style: { fontFamily: FONT_MONO, fontSize: '8px', color: 'var(--muted)', letterSpacing: '2px' } }, 'TEXTO DE PREVIEW'),
           e('input', { value: previewText, onChange: ev => setPreviewText(ev.target.value), style: { background: 'none', border: 'none', outline: 'none', color: 'var(--text)', fontSize: '11px', fontFamily: FONT_MONO, textAlign: 'right', maxWidth: '160px' } })
         ),
-        e(PixelPreview, { text: previewText, fontData, gridSize, pixelSize: 4, color: ACCENT, showSpaceMarker })
+        e(PixelPreview, { text: previewText, fontData, gridSize, pixelSize: 4, color: ACCENT, showSpaceMarker, baselineRow: getBaselineRow(gridSize) })
       ),
       e('div', { style: { display: 'flex', gap: '10px' } },
         e('button', { onClick: onClose, style: { flex: 1, padding: '12px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: R_BTN, color: 'var(--muted)', fontSize: '11px', fontFamily: FONT_MONO, cursor: 'pointer' } }, 'CANCELAR'),
@@ -432,7 +438,7 @@ export function EditorPage({
   const [showAddChar,     setShowAddChar]     = useState(false);
   const [addCharInput,    setAddCharInput]    = useState('');
   const [addCharList,     setAddCharList]     = useState([]);
-  const [extraChars,      setExtraChars]      = useState(() => { try { return JSON.parse(localStorage.getItem('cs-extra-chars') || '[]'); } catch { return []; } });
+  const [extraChars,      setExtraChars]      = useState(() => Array.isArray(initialExtraChars) ? initialExtraChars : []);
   const addCharRef = useRef(null);
   const [showSpaceMarker, setShowSpaceMarker] = useState(() => localStorage.getItem('cs-show-space-marker') !== '0');
   const [showCenterGuide, setShowCenterGuide] = useState(() => localStorage.getItem('cs-show-center-guide') !== '0');
@@ -534,6 +540,10 @@ export function EditorPage({
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [onSave, onUndo, onRedo, onInvert, onShift, onClearCanvas, setTool]);
+
+  // Persist autosave UI prefs in localStorage (are editor preferences, not project data)
+  useEffect(() => { localStorage.setItem('cs-autosave-enabled', autosaveEnabled ? '1' : '0'); }, [autosaveEnabled]);
+  useEffect(() => { localStorage.setItem('cs-autosave-minutes', String(autosaveMinutes)); }, [autosaveMinutes]);
 
   // Persist extra chars — guardado en Firebase mediante onSaveExtraChars prop
   useEffect(() => {
@@ -714,7 +724,7 @@ export function EditorPage({
           e('input', { value: previewText, onChange: ev => setPreviewText(ev.target.value), placeholder: 'texto...', style: { background: 'none', border: 'none', outline: 'none', color: 'var(--muted2)', fontSize: '10px', fontFamily: FONT_MONO, textAlign: 'right', width: '100px' } })
         ),
         e('div', { style: { background: 'var(--canvas-bg)', borderRadius: '8px', padding: '6px 8px', minHeight: '40px', overflowX: 'auto', overflowY: 'hidden', border: '1px solid var(--border)' } },
-          e(PixelPreview, { text: previewText || ' ', fontData, gridSize, pixelSize: 2, color: ACCENT, letterSpacing: 1 })
+          e(PixelPreview, { text: previewText || ' ', fontData, gridSize, pixelSize: 2, color: ACCENT, letterSpacing: 1, baselineRow: baselineGuideRow })
         ),
         e('div', { style: { height: '1px', background: 'var(--border)' } }),
         // Stats
@@ -784,11 +794,9 @@ export function EditorPage({
         )
       ),
 
-      // ── BOTÓN EXPORTAR (fuera del panel derecho) ──
-      // (renderizado como elemento del aside externo para estar entre canvas y panel)
-
-      // ── PANEL DERECHO: Caracteres ─────────────
-      e('aside', { style: { background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: R_CARD, padding: '16px', position: 'sticky', top: '68px', boxShadow: 'var(--shadow-card)', display: 'flex', flexDirection: 'column', gap: '12px' } },
+      // ── PANEL DERECHO: Caracteres + Exportar (columna derecha) ──
+      e('div', { style: { display: 'flex', flexDirection: 'column', gap: '8px', position: 'sticky', top: '68px' } },
+      e('aside', { style: { background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: R_CARD, padding: '16px', boxShadow: 'var(--shadow-card)', display: 'flex', flexDirection: 'column', gap: '12px' } },
 
         // Header con botón AddChar (3 puntos → menú flotante)
         e('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' } },
@@ -800,10 +808,13 @@ export function EditorPage({
             e('button', {
               onClick: ev => { ev.stopPropagation(); setShowAddChar(v => !v); },
               title: 'Agregar carácter especial',
-              style: { display: 'flex', alignItems: 'center', gap: '5px', padding: '4px 8px', background: showAddChar ? `${ACCENT}15` : 'var(--surface2)', border: showAddChar ? `1px solid ${ACCENT}40` : '1px solid var(--border)', borderRadius: R_BTN, cursor: 'pointer', fontFamily: FONT_MONO, fontSize: '8px', color: showAddChar ? ACCENT : 'var(--muted)', letterSpacing: '1px', transition: 'all .13s' }
+              style: { display: 'flex', alignItems: 'center', justifyContent: 'center', width: '28px', height: '28px', padding: '0', background: showAddChar ? `${ACCENT}15` : 'var(--surface2)', border: showAddChar ? `1px solid ${ACCENT}40` : '1px solid var(--border)', borderRadius: R_BTN, cursor: 'pointer', color: showAddChar ? ACCENT : 'var(--muted)', transition: 'all .13s' }
             },
-              e('span', { style: { fontSize: '11px', lineHeight: 1 } }, '···'),
-              'AGREGAR'
+              e('svg', { width: '14', height: '14', viewBox: '0 0 24 24', fill: 'currentColor' },
+                e('circle', { cx: '12', cy: '5', r: '1.8' }),
+                e('circle', { cx: '12', cy: '12', r: '1.8' }),
+                e('circle', { cx: '12', cy: '19', r: '1.8' })
+              )
             ),
 
             // ── Menú flotante de agregar caracteres ──
@@ -859,21 +870,6 @@ export function EditorPage({
           )
         ),
 
-        // Botón Exportar DENTRO del aside pero visualmente separado
-        e('button', {
-          onClick: () => setShowExport(true),
-          style: { width: '100%', padding: '7px 12px', background: 'var(--surface2)', border: `1px solid ${ACCENT}50`, borderRadius: R_BTN, color: ACCENT, fontFamily: FONT_MONO, fontWeight: '700', fontSize: '9px', letterSpacing: '2px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', transition: 'all .15s' },
-          onMouseEnter: ev => { ev.currentTarget.style.background = ACCENT; ev.currentTarget.style.color = '#fff'; },
-          onMouseLeave: ev => { ev.currentTarget.style.background = 'var(--surface2)'; ev.currentTarget.style.color = ACCENT; }
-        },
-          e('svg', { width: '11', height: '11', viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: '2.5', strokeLinecap: 'round', strokeLinejoin: 'round' },
-            e('path', { d: 'M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4' }),
-            e('polyline', { points: '7 10 12 15 17 10' }),
-            e('line', { x1: '12', y1: '15', x2: '12', y2: '3' })
-          ),
-          'EXPORTAR FUENTE'
-        ),
-
         // Búsqueda
         e('div', { style: { position: 'relative' } },
           e('input', { value: charSearch, onChange: ev => setCharSearch(ev.target.value), placeholder: 'Buscar carácter...', style: { width: '100%', padding: '8px 10px 8px 30px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: R_BTN, fontFamily: FONT_MONO, fontSize: '10px', color: 'var(--text)', outline: 'none', transition: 'border-color .15s' }, onFocus: ev => ev.target.style.borderColor = ACCENT, onBlur: ev => ev.target.style.borderColor = 'var(--border)' }),
@@ -914,7 +910,23 @@ export function EditorPage({
                 )
               );
         })()
+      ),
+
+      // Botón Exportar — FUERA del aside, abajo de los caracteres y paginación
+      e('button', {
+        onClick: () => setShowExport(true),
+        style: { width: '100%', padding: '10px 12px', background: 'var(--surface2)', border: `1px solid ${ACCENT}50`, borderRadius: R_BTN, color: ACCENT, fontFamily: FONT_MONO, fontWeight: '700', fontSize: '9px', letterSpacing: '2px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '7px', transition: 'all .15s' },
+        onMouseEnter: ev => { ev.currentTarget.style.background = ACCENT; ev.currentTarget.style.color = '#fff'; ev.currentTarget.style.borderColor = ACCENT; },
+        onMouseLeave: ev => { ev.currentTarget.style.background = 'var(--surface2)'; ev.currentTarget.style.color = ACCENT; ev.currentTarget.style.borderColor = `${ACCENT}50`; }
+      },
+        e('svg', { width: '12', height: '12', viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: '2.5', strokeLinecap: 'round', strokeLinejoin: 'round' },
+          e('path', { d: 'M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4' }),
+          e('polyline', { points: '7 10 12 15 17 10' }),
+          e('line', { x1: '12', y1: '15', x2: '12', y2: '3' })
+        ),
+        'EXPORTAR FUENTE'
       )
+      ) // cierre wrapper columna derecha
     ),
 
     // ── MODALES ────────────────────────────────
