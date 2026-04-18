@@ -243,7 +243,7 @@ const PublishModal = ({ projectName, fontData, gridSize, onClose, onPublish, isP
 const PreferencesModal = ({ onClose, showSpaceMarker, setShowSpaceMarker, showCenterGuide, setShowCenterGuide, centerGuideCol, setCenterGuideCol, xHeightGuideRow, setXHeightGuideRow, gridSize }) => {
   const [menu, setMenu] = useState('guides');
 
-  const MenuBtn = ({ id, label }) => e('button', { onClick: () => setMenu(id), style: { width: '100%', textAlign: 'left', padding: '9px 12px', background: menu === id ? `${ACCENT}12` : 'transparent', border: menu === id ? `1px solid ${ACCENT}30` : '1px solid transparent', borderRadius: R_BTN, color: menu === id ? 'var(--text)' : 'var(--muted)', fontFamily: FONT_MONO, fontSize: '10px', letterSpacing: '1px', cursor: 'pointer', transition: 'all .13s' } }, label);
+  const MenuBtn = ({ id, label }) => e('button', { onClick: () => setMenu(id), style: { width: '100%', textAlign: 'left', padding: '9px 12px', background: menu === id ? `${ACCENT}12` : 'var(--surface)', border: menu === id ? `1px solid ${ACCENT}30` : '1px solid transparent', borderRadius: R_BTN, color: menu === id ? 'var(--text)' : 'var(--muted)', fontFamily: FONT_MONO, fontSize: '10px', letterSpacing: '1px', cursor: 'pointer', transition: 'all .13s' } }, label);
 
   const ToggleCard = ({ title, desc, val, setVal }) => e('button', { onClick: () => setVal(v => !v), style: { width: '100%', textAlign: 'left', background: val ? `${ACCENT}08` : 'var(--surface2)', border: val ? `1px solid ${ACCENT}30` : '1px solid var(--border)', borderRadius: R_BTN, padding: '12px 14px', cursor: 'pointer', transition: 'all .15s' } },
     e('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '5px' } },
