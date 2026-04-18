@@ -162,7 +162,7 @@ const ExportModal = ({ projectName, fontData, gridSize, previewText: extText, on
       ),
       e('div', { style: { background: 'var(--surface2)', border: '1px solid var(--border2)', borderRadius: R_BTN, padding: '14px', minHeight: '100px' } },
         e('div', { style: { fontFamily: FONT_MONO, fontSize: '8px', color: 'var(--muted2)', letterSpacing: '2px', marginBottom: '10px' } }, 'PREVIEW'),
-        e(PixelPreview, { text: extText || 'Lorem ipsum', fontData, gridSize, pixelSize: 5, color: ACCENT, letterSpacing, wordSpacing })
+        e(PixelPreview, { text: extText || 'Lorem ipsum', fontData, gridSize, pixelSize: 4, color: ACCENT, letterSpacing, wordSpacing })
       ),
       e(Field, { label: 'NOMBRE DEL ARCHIVO' }, e('input', { value: filename, onChange: ev => setFilename(ev.target.value), style: inputStyle, onFocus: ev => ev.target.style.borderColor = ACCENT, onBlur: ev => ev.target.style.borderColor = 'var(--border)' })),
       e(Field, { label: 'NOMBRE DE LA FAMILIA' }, e('input', { value: fontName, onChange: ev => setFontName(ev.target.value), style: inputStyle, onFocus: ev => ev.target.style.borderColor = ACCENT, onBlur: ev => ev.target.style.borderColor = 'var(--border)' })),
@@ -198,7 +198,7 @@ const ExportModal = ({ projectName, fontData, gridSize, previewText: extText, on
       e('div', { style: { display: 'flex', flexDirection: 'column', gap: '8px' } },
         e('label', { style: { fontFamily: FONT_MONO, fontSize: '8px', letterSpacing: '2px', color: 'var(--muted)' } }, 'FORMATO'),
         e('div', { style: { display: 'flex', gap: '8px' } },
-          ['otf', 'ttf', 'woff'].map(f => e('button', { key: f, onClick: () => setFormat(f), style: { flex: 1, padding: '10px', borderRadius: R_BTN, cursor: 'pointer', fontFamily: FONT_MONO, fontWeight: '700', fontSize: '11px', letterSpacing: '1px', textTransform: 'uppercase', transition: 'all .13s', background: format === f ? ACCENT : 'var(--surface2)', color: format === f ? '#fff' : 'var(--muted)', border: format === f ? 'none' : '1px solid var(--border)' } }, f))
+          ['otf', 'ttf', 'woff'].map(f => e('button', { key: f, onClick: () => setFormat(f), style: { flex: 1, padding: '10px', borderRadius: R_BTN, cursor: 'pointer', fontFamily: FONT_MONO, fontWeight: '700', fontSize: '11px', letterSpacing: '1px', textTransform: 'uppercase', transition: 'all .13s', background: format === f ? ACCENT : 'var(--surface3)', color: format === f ? '#fff' : 'var(--muted)', border: format === f ? `1px solid ${ACCENT}` : '1px solid var(--border)', boxShadow: format === f ? `0 2px 8px ${ACCENT}40` : 'none' } }, f))
         )
       ),
       e('div', { style: { display: 'flex', gap: '10px', paddingTop: '4px' } },
@@ -373,6 +373,7 @@ export function EditorPage({
   const [avatarColor,     setAvatarColor]     = useState(ACCENT);
   const [charFilter,      setCharFilter]      = useState('all');
   const [charSearch,      setCharSearch]      = useState('');
+  const [charPage,        setCharPage]        = useState(0);
   const [showSpaceMarker, setShowSpaceMarker] = useState(() => localStorage.getItem('cs-show-space-marker') !== '0');
   const [showCenterGuide, setShowCenterGuide] = useState(() => localStorage.getItem('cs-show-center-guide') !== '0');
   const [showCapGuide,    setShowCapGuide]    = useState(() => localStorage.getItem('cs-show-cap-guide') !== '0');
@@ -482,6 +483,9 @@ export function EditorPage({
     if (charFilter === 'empty') chars = chars.filter(c => !fontData?.[c]?.some(Boolean));
     return chars;
   }, [charSearch, charFilter, fontData]);
+
+  // Reset page when filter/search changes
+  useEffect(() => { setCharPage(0); }, [charSearch, charFilter]);
 
   const modeTools = [
     { id: 'pencil',   iconName: 'pencil',   label: 'LÁPIZ',  tooltip: 'Lápiz (P)' },
@@ -630,8 +634,7 @@ export function EditorPage({
           ...modeTools.map(t =>
             e(Tooltip, { key: t.id, label: t.tooltip, placement: 'bottom' },
               e('button', { onClick: () => setTool(t.id), style: { ...toolbarBase, background: tool === t.id ? ACCENT : 'transparent', color: tool === t.id ? '#fff' : 'var(--muted)', boxShadow: tool === t.id ? `0 2px 8px ${ACCENT}40` : 'none' } },
-                e('img', { src: `./src/icons/${t.iconName}.svg`, style: { width: '16px', height: '16px', filter: tool === t.id ? 'invert(1)' : 'var(--icon-filter)', opacity: tool === t.id ? 1 : .65 } }),
-                e('span', { style: { fontSize: '7px', letterSpacing: '0.5px' } }, t.label)
+                e('img', { src: `./src/icons/${t.iconName}.svg`, style: { width: '16px', height: '16px', filter: tool === t.id ? 'invert(1)' : 'var(--icon-filter)', opacity: tool === t.id ? 1 : .65 } })
               )
             )
           ),
@@ -675,6 +678,21 @@ export function EditorPage({
           e('span', { style: { fontFamily: FONT_MONO, fontSize: '10px', color: 'var(--muted2)' } }, `${doneGlyphs}/${totalGlyphs}`)
         ),
 
+        // Botón Exportar debajo del header
+        e('button', {
+          onClick: () => setShowExport(true),
+          style: { width: '100%', padding: '8px 12px', background: ACCENT, border: 'none', borderRadius: R_BTN, color: '#fff', fontFamily: FONT_MONO, fontWeight: '700', fontSize: '9px', letterSpacing: '2px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', boxShadow: `0 2px 8px ${ACCENT}40`, transition: 'opacity .15s' },
+          onMouseEnter: ev => ev.currentTarget.style.opacity = '.85',
+          onMouseLeave: ev => ev.currentTarget.style.opacity = '1'
+        },
+          e('svg', { width: '12', height: '12', viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: '2.5', strokeLinecap: 'round', strokeLinejoin: 'round' },
+            e('path', { d: 'M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4' }),
+            e('polyline', { points: '7 10 12 15 17 10' }),
+            e('line', { x1: '12', y1: '15', x2: '12', y2: '3' })
+          ),
+          'EXPORTAR'
+        ),
+
         // Búsqueda
         e('div', { style: { position: 'relative' } },
           e('input', { value: charSearch, onChange: ev => setCharSearch(ev.target.value), placeholder: 'Buscar carácter...', style: { width: '100%', padding: '8px 10px 8px 30px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: R_BTN, fontFamily: FONT_MONO, fontSize: '10px', color: 'var(--text)', outline: 'none', transition: 'border-color .15s' }, onFocus: ev => ev.target.style.borderColor = ACCENT, onBlur: ev => ev.target.style.borderColor = 'var(--border)' }),
@@ -684,24 +702,36 @@ export function EditorPage({
         // Filtros
         e('div', { style: { display: 'flex', gap: '4px' } },
           [{ id: 'all', label: 'Todos' }, { id: 'done', label: 'Listos' }, { id: 'empty', label: 'Vacíos' }].map(({ id, label }) =>
-            e('button', { key: id, onClick: () => setCharFilter(id), style: { flex: 1, padding: '5px 6px', borderRadius: R_BTN, cursor: 'pointer', fontFamily: FONT_MONO, fontSize: '8px', background: charFilter === id ? ACCENT : 'var(--surface2)', color: charFilter === id ? '#fff' : 'var(--muted)', border: charFilter === id ? 'none' : '1px solid var(--border)', transition: 'all .13s' } }, label)
+            e('button', { key: id, onClick: () => { setCharFilter(id); setCharPage(0); }, style: { flex: 1, padding: '5px 6px', borderRadius: R_BTN, cursor: 'pointer', fontFamily: FONT_MONO, fontSize: '8px', background: charFilter === id ? ACCENT : 'var(--surface2)', color: charFilter === id ? '#fff' : 'var(--muted)', border: charFilter === id ? 'none' : '1px solid var(--border)', transition: 'all .13s' } }, label)
           )
         ),
 
-        // Grilla de caracteres
-        filteredChars.length === 0
-          ? e('div', { style: { padding: '24px', textAlign: 'center', fontFamily: FONT_MONO, fontSize: '10px', color: 'var(--muted2)' } }, 'Sin resultados')
-          : e('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '4px', maxHeight: '52vh', overflowY: 'auto', paddingRight: '2px', scrollbarWidth: 'thin' } },
-              filteredChars.map(t => {
-                const configured = fontData?.[t]?.some(Boolean);
-                const isActive   = currentChar === t;
-                return e('button', { key: t, onClick: () => onSwitchChar(t), title: t === ' ' ? 'Espacio' : t, style: { height: '44px', borderRadius: R_BTN, cursor: 'pointer', border: isActive ? 'none' : `1px solid ${configured ? `${ACCENT}30` : 'var(--border)'}`, background: isActive ? ACCENT : configured ? `${ACCENT}08` : 'var(--surface2)', color: isActive ? '#fff' : configured ? ACCENT : 'var(--muted)', fontWeight: '700', fontSize: '13px', fontFamily: FONT_MONO, position: 'relative', boxShadow: isActive ? `0 3px 10px ${ACCENT}40` : 'none', transition: 'all .1s' } },
-                  t === ' ' ? '·' : t,
-                  (showSpaceMarker && t === ' ') && e('div', { style: { position: 'absolute', top: '8px', bottom: '8px', left: '50%', width: '1px', transform: 'translateX(-50%)', background: isActive ? 'rgba(255,255,255,0.9)' : 'var(--border-accent)', opacity: .8 } }),
-                  configured && !isActive && e('div', { style: { position: 'absolute', top: '4px', right: '4px', width: '4px', height: '4px', borderRadius: '50%', background: ACCENT } })
-                );
-              })
-            )
+        // Grilla de caracteres paginada (6×5 = 30 por página)
+        (() => {
+          const PAGE_SIZE = 30;
+          const totalPages = Math.ceil(filteredChars.length / PAGE_SIZE);
+          const pageChars = filteredChars.slice(charPage * PAGE_SIZE, (charPage + 1) * PAGE_SIZE);
+          return filteredChars.length === 0
+            ? e('div', { style: { padding: '24px', textAlign: 'center', fontFamily: FONT_MONO, fontSize: '10px', color: 'var(--muted2)' } }, 'Sin resultados')
+            : e('div', { style: { display: 'flex', flexDirection: 'column', gap: '6px' } },
+                e('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '4px' } },
+                  pageChars.map(t => {
+                    const configured = fontData?.[t]?.some(Boolean);
+                    const isActive   = currentChar === t;
+                    return e('button', { key: t, onClick: () => onSwitchChar(t), title: t === ' ' ? 'Espacio' : t, style: { height: '40px', borderRadius: R_BTN, cursor: 'pointer', border: isActive ? 'none' : `1px solid ${configured ? `${ACCENT}30` : 'var(--border)'}`, background: isActive ? ACCENT : configured ? `${ACCENT}08` : 'var(--surface2)', color: isActive ? '#fff' : configured ? ACCENT : 'var(--muted)', fontWeight: '700', fontSize: '13px', fontFamily: FONT_MONO, position: 'relative', boxShadow: isActive ? `0 3px 10px ${ACCENT}40` : 'none', transition: 'all .1s' } },
+                      t === ' ' ? '·' : t,
+                      (showSpaceMarker && t === ' ') && e('div', { style: { position: 'absolute', top: '8px', bottom: '8px', left: '50%', width: '1px', transform: 'translateX(-50%)', background: isActive ? 'rgba(255,255,255,0.9)' : 'var(--border-accent)', opacity: .8 } }),
+                      configured && !isActive && e('div', { style: { position: 'absolute', top: '4px', right: '4px', width: '4px', height: '4px', borderRadius: '50%', background: ACCENT } })
+                    );
+                  })
+                ),
+                totalPages > 1 && e('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '4px', marginTop: '2px' } },
+                  e('button', { onClick: () => setCharPage(p => Math.max(0, p - 1)), disabled: charPage === 0, style: { width: '28px', height: '24px', borderRadius: R_BTN, border: '1px solid var(--border)', background: 'var(--surface2)', color: 'var(--muted)', cursor: charPage === 0 ? 'not-allowed' : 'pointer', fontFamily: FONT_MONO, fontSize: '11px', opacity: charPage === 0 ? .35 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, '‹'),
+                  e('span', { style: { fontFamily: FONT_MONO, fontSize: '8px', color: 'var(--muted2)', letterSpacing: '1px' } }, `${charPage + 1} / ${totalPages}`),
+                  e('button', { onClick: () => setCharPage(p => Math.min(totalPages - 1, p + 1)), disabled: charPage >= totalPages - 1, style: { width: '28px', height: '24px', borderRadius: R_BTN, border: '1px solid var(--border)', background: 'var(--surface2)', color: 'var(--muted)', cursor: charPage >= totalPages - 1 ? 'not-allowed' : 'pointer', fontFamily: FONT_MONO, fontSize: '11px', opacity: charPage >= totalPages - 1 ? .35 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, '›')
+                )
+              );
+        })()
       )
     ),
 
