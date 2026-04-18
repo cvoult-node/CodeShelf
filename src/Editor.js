@@ -1,11 +1,9 @@
 // ─────────────────────────────────────────────
-//  EDITOR — src/Editor.js  (v2.1)
-//  Cambios v2.1:
-//  • Eliminadas acciones rápidas del panel izquierdo
-//  • Todas las guías (CAP, X-H, BASE, DESC) ahora son editables en Preferencias
-//  • Eliminado zoom — canvas fijo en 460px
-//  • Botones de herramientas: solo iconos, sin texto
-//  • Preview de exportación más grande (pixelSize: 7)
+//  EDITOR — src/Editor.js  (v2.2)
+//  Cambios v2.2:
+//  • Quitada barra de progreso del panel izquierdo
+//  • Glifos exportados a tamaño correcto: S dinámico según gridSize y unitsPerEm
+//  • Defaults de ascender/descender calculados automáticamente
 // ─────────────────────────────────────────────
 import React, { useState, useRef, useCallback, useEffect, useMemo } from 'https://esm.sh/react@18.2.0';
 import { auth, signOut } from './firebase.js';
@@ -42,16 +40,16 @@ const PixelPreview = ({ text, fontData, gridSize, pixelSize = 3, color = ACCENT,
       const glyph = fontData[ch];
       const bounds = getBounds(glyph);
       const isSpace = ch === ' ';
-      const spacingPx = isSpace ? wordSpacing * 0.22 : letterSpacing * ;
-      const minSpaceWidth = Math.max( * 2, 1);
-      const computedSpaceWidth = Math.max(minSpaceWidth,  * 3 + wordSpacing * 0.2);
+      const spacingPx = isSpace ? wordSpacing * 0.22 : letterSpacing * pixelSize;
+      const minSpaceWidth = Math.max(pixelSize * 2, 1);
+      const computedSpaceWidth = Math.max(minSpaceWidth, pixelSize * 3 + wordSpacing * 0.2);
       const glyphCols = bounds ? (bounds.maxCol - bounds.minCol + 1) : sz;
       const glyphRows = sz;
 
       return e('div', {
         key: ci,
         style: {
-          display: 'grid', gridTemplateColumns: `repeat(${glyphCols},${}px)`, gridTemplateRows: `repeat(${glyphRows},${pixelSize}px)`,
+          display: 'grid', gridTemplateColumns: `repeat(${glyphCols},${pixelSize}px)`, gridTemplateRows: `repeat(${glyphRows},${pixelSize}px)`,
           position: 'relative', width: isSpace ? `${computedSpaceWidth}px` : undefined, minWidth: isSpace ? `${minSpaceWidth}px` : undefined,
           marginRight: `${spacingPx}px`, border: (isSpace && showSpaceMarker) ? '1px dashed var(--border)' : 'none',
           borderRadius: '4px', padding: (isSpace && showSpaceMarker) ? '2px' : 0, flexShrink: 0, alignSelf: 'flex-end'
@@ -134,8 +132,17 @@ const ExportModal = ({ projectName, fontData, gridSize, previewText: extText, on
   const [wordSpacing, setWordSpacing] = useState(10);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [unitsPerEm, setUnitsPerEm] = useState(1000);
-  const [ascender, setAscender] = useState(800);
-  const [descender, setDescender] = useState(-250);
+
+  // S dinámico = mismo cálculo que canvas.js — glifos llenan ~80% del em
+  const S = Math.round((unitsPerEm * 0.80) / gridSize);
+  const baselineRow = getBaselineRow(gridSize);
+  // ascender: desde baseline hasta arriba del grid, en unidades opentype
+  const defaultAscender = Math.round(baselineRow * S);
+  // descender: filas debajo de baseline (negativo)
+  const defaultDescender = -Math.round((gridSize - baselineRow) * S);
+
+  const [ascender,  setAscender]  = useState(defaultAscender);
+  const [descender, setDescender] = useState(defaultDescender);
 
   const inputStyle = { background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: R_BTN, padding: '10px 13px', color: 'var(--text)', fontSize: '13px', outline: 'none', fontFamily: FONT_MONO, width: '100%', transition: 'border-color .15s' };
   const sliderStyle = { width: '100%', accentColor: ACCENT, cursor: 'pointer' };
@@ -149,7 +156,7 @@ const ExportModal = ({ projectName, fontData, gridSize, previewText: extText, on
       ),
       e('div', { style: { background: 'var(--surface2)', border: '1px solid var(--border2)', borderRadius: R_BTN, padding: '14px', minHeight: '100px' } },
         e('div', { style: { fontFamily: FONT_MONO, fontSize: '8px', color: 'var(--muted2)', letterSpacing: '2px', marginBottom: '10px' } }, 'PREVIEW'),
-        e(PixelPreview, { text: extText || 'Lorem ipsum', fontData, gridSize, pixelSize: 5, color: ACCENT, letterSpacing, wordSpacing })
+        e(PixelPreview, { text: extText || 'Lorem ipsum', fontData, gridSize, pixelSize: 7, color: ACCENT, letterSpacing, wordSpacing })
       ),
       e(Field, { label: 'NOMBRE DEL ARCHIVO' }, e('input', { value: filename, onChange: ev => setFilename(ev.target.value), style: inputStyle, onFocus: ev => ev.target.style.borderColor = ACCENT, onBlur: ev => ev.target.style.borderColor = 'var(--border)' })),
       e(Field, { label: 'NOMBRE DE LA FAMILIA' }, e('input', { value: fontName, onChange: ev => setFontName(ev.target.value), style: inputStyle, onFocus: ev => ev.target.style.borderColor = ACCENT, onBlur: ev => ev.target.style.borderColor = 'var(--border)' })),
@@ -179,7 +186,7 @@ const ExportModal = ({ projectName, fontData, gridSize, previewText: extText, on
               )
             )
           ),
-          e('p', { style: { fontFamily: FONT_MONO, fontSize: '9px', color: 'var(--muted2)', lineHeight: '1.6', margin: 0 } }, `Métrica para ${gridSize}×${gridSize}px. Baseline en fila ${getBaselineRow(gridSize)}.`)
+          e('p', { style: { fontFamily: FONT_MONO, fontSize: '9px', color: 'var(--muted2)', lineHeight: '1.6', margin: 0 } }, `Grid ${gridSize}×${gridSize}px · ${S} unidades/px · Baseline fila ${getBaselineRow(gridSize)}.`)
         )
       ),
       e('div', { style: { display: 'flex', flexDirection: 'column', gap: '8px' } },
@@ -579,16 +586,7 @@ export function EditorPage({
             )
           )
         ),
-        // Barra progreso
-        e('div', { style: { display: 'flex', flexDirection: 'column', gap: '5px' } },
-          e('div', { style: { display: 'flex', justifyContent: 'space-between' } },
-            e('span', { style: { fontFamily: FONT_MONO, fontSize: '8px', color: 'var(--muted)', letterSpacing: '1px' } }, 'PROGRESO'),
-            e('span', { style: { fontFamily: FONT_MONO, fontSize: '8px', color: ACCENT } }, `${progress}%`)
-          ),
-          e('div', { style: { height: '5px', background: 'var(--border)', borderRadius: '3px', overflow: 'hidden' } },
-            e('div', { style: { width: `${progress}%`, height: '100%', background: ACCENT, borderRadius: '3px', transition: 'width .4s ease' } })
-          )
-        ),
+
 
       ),
 

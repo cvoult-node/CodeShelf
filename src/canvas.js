@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────
-//  CANVAS ALGORITHMS — src/canvas.js
+//  CANVAS ALGORITHMS — src/canvas.js  (v2.2)
 // ─────────────────────────────────────────────
 
 /** Flood fill 4-conectado */
@@ -74,8 +74,9 @@ export function buildAndDownload(fontData, gridSize, filename, format, meta = {}
   } = meta;
 
   // Escala: cada píxel del canvas → S unidades opentype
-  // letterSpacing ya está en px del canvas, se convierte directamente
-  const S = 10;
+  // Calculamos S para que el gridSize llene ~80% del em (deja margen para métricas)
+  // Esto hace que los glifos salgan a tamaño correcto sin importar el gridSize o unitsPerEm
+  const S = Math.round((unitsPerEm * 0.80) / gridSize);
   const pxSpacing = Math.round(letterSpacing * S);
 
   // Fila de baseline (0-indexed desde arriba del grid)
