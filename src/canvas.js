@@ -74,9 +74,8 @@ export function buildAndDownload(fontData, gridSize, filename, format, meta = {}
   } = meta;
 
   // Escala: cada píxel del canvas → S unidades opentype
-  // Calculamos S para que el gridSize llene ~80% del em (deja margen para métricas)
-  // Esto hace que los glifos salgan a tamaño correcto sin importar el gridSize o unitsPerEm
-  const S = Math.round((unitsPerEm * 1) / gridSize);
+  // S = 1.0 → el gridSize llena exactamente el em completo
+  const S = Math.round((unitsPerEm * 1.0) / gridSize);
   const pxSpacing = Math.round(letterSpacing * S);
 
   // Fila de baseline (0-indexed desde arriba del grid)

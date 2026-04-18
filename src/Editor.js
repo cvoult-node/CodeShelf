@@ -92,7 +92,7 @@ const ZoomControl = ({ zoom, setZoom }) =>
 // ─────────────────────────────────────────────
 //  GUIDE OVERLAY
 // ─────────────────────────────────────────────
-const GuideOverlay = ({ gridSize, capGuideRow, xHeightGuideRow, baselineGuideRow, descGuideRow, centerGuideCol, showCenterGuide }) => {
+const GuideOverlay = ({ gridSize, capGuideRow, xHeightGuideRow, baselineGuideRow, descGuideRow, centerGuideCol, showCenterGuide, showHGuides = true }) => {
   const lines = [];
   const cap      = clamp(capGuideRow      ?? 1,                           0, gridSize - 1);
   const xHeight  = clamp(xHeightGuideRow  ?? Math.round(gridSize * 0.33), 0, gridSize - 1);
@@ -100,8 +100,10 @@ const GuideOverlay = ({ gridSize, capGuideRow, xHeightGuideRow, baselineGuideRow
   const desc     = clamp(descGuideRow     ?? gridSize - 1,                0, gridSize - 1);
   const rowPct = (row) => (row / gridSize * 100).toFixed(4);
 
-  // Descendente zone background
-  lines.push(e('rect', { key: 'desc-zone', x: '0', y: `${rowPct(baseline)}%`, width: '100%', height: `${(100 - Number(rowPct(baseline))).toFixed(4)}%`, fill: 'rgba(191,69,69,0.04)' }));
+  // Descendente zone background (solo si las guías h están activas)
+  if (showHGuides) {
+    lines.push(e('rect', { key: 'desc-zone', x: '0', y: `${rowPct(baseline)}%`, width: '100%', height: `${(100 - Number(rowPct(baseline))).toFixed(4)}%`, fill: 'rgba(191,69,69,0.04)' }));
+  }
 
   if (showCenterGuide) {
     const colPct = (centerGuideCol / gridSize * 100).toFixed(4);
@@ -116,7 +118,10 @@ const GuideOverlay = ({ gridSize, capGuideRow, xHeightGuideRow, baselineGuideRow
     ];
   };
 
-  lines.push(...guide('cap', cap, 'CAP', 0.45, '1.3'), ...guide('xh', xHeight, 'X-H', 0.40, '1.1', '3 3'), ...guide('base', baseline, 'BASE', 0.90, '1.8'), ...guide('desc', desc, 'DESC', 0.35, '1.0', '2 2'));
+  if (showHGuides) {
+    lines.push(...guide('cap', cap, 'CAP', 0.45, '1.3'), ...guide('xh', xHeight, 'X-H', 0.40, '1.1', '3 3'), ...guide('base', baseline, 'BASE', 0.90, '1.8'), ...guide('desc', desc, 'DESC', 0.35, '1.0', '2 2'));
+  }
+
   return e('svg', { style: { position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 5 }, xmlns: 'http://www.w3.org/2000/svg' }, ...lines);
 };
 
@@ -134,7 +139,7 @@ const ExportModal = ({ projectName, fontData, gridSize, previewText: extText, on
   const [unitsPerEm, setUnitsPerEm] = useState(1000);
 
   // S dinámico = mismo cálculo que canvas.js — glifos llenan ~80% del em
-  const S = Math.round((unitsPerEm * 1) / gridSize);
+  const S = Math.round((unitsPerEm * 0.80) / gridSize);
   const baselineRow = getBaselineRow(gridSize);
   // ascender: desde baseline hasta arriba del grid, en unidades opentype
   const defaultAscender = Math.round(baselineRow * S);
@@ -156,7 +161,7 @@ const ExportModal = ({ projectName, fontData, gridSize, previewText: extText, on
       ),
       e('div', { style: { background: 'var(--surface2)', border: '1px solid var(--border2)', borderRadius: R_BTN, padding: '14px', minHeight: '100px' } },
         e('div', { style: { fontFamily: FONT_MONO, fontSize: '8px', color: 'var(--muted2)', letterSpacing: '2px', marginBottom: '10px' } }, 'PREVIEW'),
-        e(PixelPreview, { text: extText || 'Lorem ipsum', fontData, gridSize, pixelSize: 4, color: ACCENT, letterSpacing, wordSpacing })
+        e(PixelPreview, { text: extText || 'Lorem ipsum', fontData, gridSize, pixelSize: 5, color: ACCENT, letterSpacing, wordSpacing })
       ),
       e(Field, { label: 'NOMBRE DEL ARCHIVO' }, e('input', { value: filename, onChange: ev => setFilename(ev.target.value), style: inputStyle, onFocus: ev => ev.target.style.borderColor = ACCENT, onBlur: ev => ev.target.style.borderColor = 'var(--border)' })),
       e(Field, { label: 'NOMBRE DE LA FAMILIA' }, e('input', { value: fontName, onChange: ev => setFontName(ev.target.value), style: inputStyle, onFocus: ev => ev.target.style.borderColor = ACCENT, onBlur: ev => ev.target.style.borderColor = 'var(--border)' })),
@@ -243,7 +248,7 @@ const PublishModal = ({ projectName, fontData, gridSize, onClose, onPublish, isP
 // ─────────────────────────────────────────────
 //  PREFERENCES MODAL
 // ─────────────────────────────────────────────
-const PreferencesModal = ({ onClose, showSpaceMarker, setShowSpaceMarker, showCenterGuide, setShowCenterGuide, centerGuideCol, setCenterGuideCol, capGuideRow, setCapGuideRow, xHeightGuideRow, setXHeightGuideRow, baselineGuideRow, setBaselineGuideRow, descGuideRow, setDescGuideRow, gridSize }) => {
+const PreferencesModal = ({ onClose, showSpaceMarker, setShowSpaceMarker, showCenterGuide, setShowCenterGuide, showHGuides, setShowHGuides, centerGuideCol, setCenterGuideCol, capGuideRow, setCapGuideRow, xHeightGuideRow, setXHeightGuideRow, baselineGuideRow, setBaselineGuideRow, descGuideRow, setDescGuideRow, gridSize }) => {
   const [menu, setMenu] = useState('guides');
 
   const MenuBtn = ({ id, label }) => e('button', { onClick: () => setMenu(id), style: { width: '100%', textAlign: 'left', padding: '9px 12px', background: menu === id ? `${ACCENT}12` : 'transparent', border: menu === id ? `1px solid ${ACCENT}30` : '1px solid transparent', borderRadius: R_BTN, color: menu === id ? 'var(--text)' : 'var(--muted)', fontFamily: FONT_MONO, fontSize: '10px', letterSpacing: '1px', cursor: 'pointer', transition: 'all .13s' } }, label);
@@ -269,10 +274,10 @@ const PreferencesModal = ({ onClose, showSpaceMarker, setShowSpaceMarker, showCe
     const pct = (row) => `${(row / Math.max(1, gridSize)) * 100}%`;
     return e('div', { style: { width: '160px', height: '160px', alignSelf: 'center', position: 'relative', border: '1px solid var(--border)', borderRadius: '10px', overflow: 'hidden', background: 'var(--surface2)' } },
       e('div', { style: { position: 'absolute', inset: 0, display: 'grid', gridTemplateColumns: `repeat(${previewSize}, 1fr)`, gridTemplateRows: `repeat(${previewSize}, 1fr)`, gap: '1px', background: 'var(--grid-line)' } }, Array(previewSize * previewSize).fill(0).map((_, i) => e('div', { key: i, style: { background: 'var(--empty)' } }))),
-      e('div', { style: { position: 'absolute', left: 0, right: 0, top: pct(capGuideRow), height: '1px', background: 'rgba(191,69,69,.45)' } }),
-      e('div', { style: { position: 'absolute', left: 0, right: 0, top: pct(xHeightGuideRow), height: '1px', background: 'rgba(191,69,69,.40)', borderTop: '1px dashed rgba(191,69,69,.4)' } }),
-      e('div', { style: { position: 'absolute', left: 0, right: 0, top: pct(baselineGuideRow), height: '2px', background: 'rgba(191,69,69,.90)' } }),
-      e('div', { style: { position: 'absolute', left: 0, right: 0, top: pct(descGuideRow), height: '1px', background: 'rgba(191,69,69,.35)', borderTop: '1px dashed rgba(191,69,69,.35)' } }),
+      showHGuides && e('div', { style: { position: 'absolute', left: 0, right: 0, top: pct(capGuideRow), height: '1px', background: 'rgba(191,69,69,.45)' } }),
+      showHGuides && e('div', { style: { position: 'absolute', left: 0, right: 0, top: pct(xHeightGuideRow), height: '1px', background: 'rgba(191,69,69,.40)', borderTop: '1px dashed rgba(191,69,69,.4)' } }),
+      showHGuides && e('div', { style: { position: 'absolute', left: 0, right: 0, top: pct(baselineGuideRow), height: '2px', background: 'rgba(191,69,69,.90)' } }),
+      showHGuides && e('div', { style: { position: 'absolute', left: 0, right: 0, top: pct(descGuideRow), height: '1px', background: 'rgba(191,69,69,.35)', borderTop: '1px dashed rgba(191,69,69,.35)' } }),
       showCenterGuide && e('div', { style: { position: 'absolute', top: 0, bottom: 0, left: `${(centerGuideCol / Math.max(1, gridSize)) * 100}%`, width: '2px', background: 'rgba(191,69,69,.8)' } })
     );
   };
@@ -299,15 +304,20 @@ const PreferencesModal = ({ onClose, showSpaceMarker, setShowSpaceMarker, showCe
         ),
         e('section', { style: { border: '1px solid var(--border)', borderRadius: R_BTN, background: 'var(--surface)', padding: '16px', display: 'flex', flexDirection: 'column', gap: '14px', overflowY: 'auto' } },
           menu === 'guides' && e(React.Fragment, null,
-            e(ToggleCard, { title: 'Guía vertical editable', desc: 'Muestra una línea vertical configurable para marcar el ancho del glifo.', val: showCenterGuide, setVal: setShowCenterGuide }),
-            e('div', { style: { background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: R_BTN, padding: '14px', display: 'flex', flexDirection: 'column', gap: '14px' } },
+            e('div', { style: { display: 'flex', flexDirection: 'column', gap: '8px' } },
+              e(ToggleCard, { title: 'Guías horizontales', desc: 'Muestra las líneas CAP, X-Height, Baseline y Descender sobre el canvas.', val: showHGuides, setVal: setShowHGuides }),
+              e(ToggleCard, { title: 'Guía vertical editable', desc: 'Muestra una línea vertical configurable para marcar el ancho del glifo.', val: showCenterGuide, setVal: setShowCenterGuide })
+            ),
+            e('div', { style: { background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: R_BTN, padding: '14px', display: 'flex', flexDirection: 'column', gap: '14px', opacity: showHGuides ? 1 : 0.4, pointerEvents: showHGuides ? 'auto' : 'none' } },
               e('div', { style: { fontFamily: FONT_MONO, fontSize: '8px', color: 'var(--muted2)', letterSpacing: '2px', marginBottom: '2px' } }, 'LÍNEAS HORIZONTALES'),
               e(SliderInput, { label: `CAP (fila ${capGuideRow})`, value: capGuideRow, onChange: ev => setCapGuideRow(Number(ev.target.value)), min: 0, max: Math.max(0, gridSize - 1) }),
               e(SliderInput, { label: `X-Height (fila ${xHeightGuideRow})`, value: xHeightGuideRow, onChange: ev => setXHeightGuideRow(Number(ev.target.value)), min: 0, max: Math.max(0, gridSize - 1) }),
               e(SliderInput, { label: `Baseline (fila ${baselineGuideRow})`, value: baselineGuideRow, onChange: ev => setBaselineGuideRow(Number(ev.target.value)), min: 0, max: Math.max(0, gridSize - 1) }),
               e(SliderInput, { label: `Descender (fila ${descGuideRow})`, value: descGuideRow, onChange: ev => setDescGuideRow(Number(ev.target.value)), min: 0, max: Math.max(0, gridSize - 1) }),
-              e('div', { style: { fontFamily: FONT_MONO, fontSize: '8px', color: 'var(--muted2)', letterSpacing: '2px', marginTop: '4px' } }, 'LÍNEA VERTICAL'),
-              e(SliderInput, { label: `Guía vertical (col ${centerGuideCol})`, value: centerGuideCol, onChange: ev => setCenterGuideCol(Number(ev.target.value)), min: 0, max: Math.max(0, gridSize - 1) })
+              e('div', { style: { fontFamily: FONT_MONO, fontSize: '8px', color: 'var(--muted2)', letterSpacing: '2px', marginTop: '4px', opacity: showCenterGuide ? 1 : 0.5 } }, 'LÍNEA VERTICAL'),
+              e('div', { style: { opacity: showCenterGuide ? 1 : 0.4, pointerEvents: showCenterGuide ? 'auto' : 'none' } },
+                e(SliderInput, { label: `Guía vertical (col ${centerGuideCol})`, value: centerGuideCol, onChange: ev => setCenterGuideCol(Number(ev.target.value)), min: 0, max: Math.max(0, gridSize - 1) })
+              )
             ),
             e(GuidePreview)
           ),
@@ -353,6 +363,7 @@ export function EditorPage({
   const [charSearch,      setCharSearch]      = useState('');
   const [showSpaceMarker, setShowSpaceMarker] = useState(() => localStorage.getItem('cs-show-space-marker') !== '0');
   const [showCenterGuide, setShowCenterGuide] = useState(() => localStorage.getItem('cs-show-center-guide') !== '0');
+  const [showHGuides,     setShowHGuides]     = useState(() => localStorage.getItem('cs-show-h-guides') !== '0');
   const [centerGuideCol,  setCenterGuideCol]  = useState(() => Number(localStorage.getItem('cs-center-guide-col') ?? 2));
   const [capGuideRow,     setCapGuideRow]     = useState(() => readNumberSetting(EDITOR_STORAGE_KEYS.capGuideRow, 1));
   const [xHeightGuideRow, setXHeightGuideRow] = useState(() => readNumberSetting(EDITOR_STORAGE_KEYS.xHeightGuideRow, Math.round(gridSize * 0.33)));
@@ -389,6 +400,7 @@ export function EditorPage({
   // Persistir ajustes
   useEffect(() => { writeSetting(EDITOR_STORAGE_KEYS.showSpaceMarker, showSpaceMarker ? '1' : '0'); }, [showSpaceMarker]);
   useEffect(() => { localStorage.setItem('cs-show-center-guide', showCenterGuide ? '1' : '0'); }, [showCenterGuide]);
+  useEffect(() => { localStorage.setItem('cs-show-h-guides', showHGuides ? '1' : '0'); }, [showHGuides]);
   useEffect(() => {
     const clamped = clamp(centerGuideCol || 0, 0, gridSize - 1);
     if (clamped !== centerGuideCol) setCenterGuideCol(clamped);
@@ -566,15 +578,8 @@ export function EditorPage({
           e('span', { style: { fontFamily: FONT_MONO, fontSize: '8px', letterSpacing: '3px', color: 'var(--muted)' } }, 'PREVIEW'),
           e('input', { value: previewText, onChange: ev => setPreviewText(ev.target.value), placeholder: 'texto...', style: { background: 'none', border: 'none', outline: 'none', color: 'var(--muted2)', fontSize: '10px', fontFamily: FONT_MONO, textAlign: 'right', width: '100px' } })
         ),
-        e('div', { style: { background: 'var(--canvas-bg)', borderRadius: '8px', padding: '8px', height: '56px', overflowX: 'auto', overflowY: 'hidden', display: 'flex', alignItems: 'center', whiteSpace: 'nowrap', scrollbarWidth: 'thin', border: '1px solid var(--border)' } },
-          e('div', { style: { display: 'flex', gap: '0px', alignItems: 'center', flexShrink: 0 } },
-            previewText.split('').map((ch, ci) => {
-              const glyph = fontData[ch]; const sz = Math.min(gridSize, 14), px = 2; const isSpace = ch === ' ';
-              return e('div', { key: ci, style: { display: 'grid', gridTemplateColumns: `repeat(${sz},${px}px)`, marginRight: '1px', flexShrink: 0, border: (isSpace && showSpaceMarker) ? '1px dashed var(--border)' : 'none', borderRadius: '2px', minWidth: isSpace ? `${sz * px}px` : undefined } },
-                isSpace ? null : Array(sz * sz).fill(0).map((_, pi) => e('div', { key: pi, style: { width: `${px}px`, height: `${px}px`, background: glyph?.[pi] ? ACCENT : 'transparent' } }))
-              );
-            })
-          )
+        e('div', { style: { background: 'var(--canvas-bg)', borderRadius: '8px', padding: '6px 8px', minHeight: '40px', overflowX: 'auto', overflowY: 'hidden', border: '1px solid var(--border)' } },
+          e(PixelPreview, { text: previewText || ' ', fontData, gridSize, pixelSize: 2, color: ACCENT })
         ),
         e('div', { style: { height: '1px', background: 'var(--border)' } }),
         // Stats
@@ -641,7 +646,7 @@ export function EditorPage({
           (showSpaceMarker && currentChar === ' ') && e('div', { style: { position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 4 } },
             e('div', { style: { position: 'absolute', top: '2px', bottom: '2px', left: '50%', width: '1px', transform: 'translateX(-50%)', background: 'var(--border-accent)', opacity: .8 } })
           ),
-          e(GuideOverlay, { gridSize, capGuideRow, xHeightGuideRow, baselineGuideRow, descGuideRow, centerGuideCol, showCenterGuide })
+          e(GuideOverlay, { gridSize, capGuideRow, xHeightGuideRow, baselineGuideRow, descGuideRow, centerGuideCol, showCenterGuide, showHGuides })
         )
       ),
 
@@ -706,6 +711,7 @@ export function EditorPage({
       onClose: () => setShowPrefs(false),
       showSpaceMarker, setShowSpaceMarker,
       showCenterGuide, setShowCenterGuide,
+      showHGuides, setShowHGuides,
       centerGuideCol, setCenterGuideCol,
       capGuideRow, setCapGuideRow,
       xHeightGuideRow, setXHeightGuideRow,
