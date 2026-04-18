@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────
-//  EDITOR — src/Editor.js  (v2.3)
+//  EDITOR — src/Editor.js  (v2.4)
 //  Cambios v2.3 (mejoras de rendimiento y correcciones):
 //  • TOOLTIP_POS movido fuera de Tooltip — ya no se recrea en cada render
 //  • EXTENDED_CHARS movido fuera de EditorPage — ya no se recrea en cada render
@@ -10,6 +10,14 @@
 //  • 5 efectos de persistencia de guías consolidados en uno solo
 //  • 2 efectos de autosave consolidados en uno solo
 //  • canvasSize eliminado (era alias innecesario de CANVAS_BASE)
+//  Cambios v2.4 (reorganización de barra de herramientas):
+//  • Toolbar rediseñada con 5 grupos: Edición, Historial, Transformación, Movimiento, Gestión
+//  • Todos los iconos migrados a SVG inline — mismo set, mismo stroke, sin dependencia de archivos externos
+//  • Undo/Redo usan flechas curvas (ya no flechas rectas que confundían con movimiento)
+//  • Flechas de movimiento usan el mismo set y strokeWidth (antes usaban mirror-h/mirror-v incorrectamente)
+//  • Grupo D (movimiento) usa gap:1px más compacto que el gap entre grupos
+//  • Eliminar movido al final del Grupo E para evitar clics accidentales al copiar/pegar
+//  • ActionBtn helper component elimina duplicación de hover handlers
 // ─────────────────────────────────────────────
 import React, { useState, useRef, useCallback, useEffect, useMemo } from 'https://esm.sh/react@18.2.0';
 import { auth, signOut } from './firebase.js';
@@ -739,24 +747,55 @@ export function EditorPage({
     if (toAdd[0]) onSwitchChar(toAdd[0]);
   }, [addCharList, extraChars, onSwitchChar, onSaveExtraChars]);
 
-  const modeTools = [
-    { id: 'pencil',   iconName: 'pencil',   label: 'LÁPIZ',  tooltip: 'Lápiz (P)' },
-    { id: 'fill',     iconName: 'fill',     label: 'FILL',   tooltip: 'Relleno (F)' },
-    { id: 'mirror-h', iconName: 'mirror-h', label: 'ESP. H', tooltip: 'Espejo H (H)' },
-    { id: 'mirror-v', iconName: 'mirror-v', label: 'ESP. V', tooltip: 'Espejo V (V)' },
+  // ── Inline SVG icons — mismo set, mismo stroke, sin depender de archivos .svg externos
+  const IC = {
+    // Grupo A: Edición
+    pencil:   e('svg', { width: '15', height: '15', viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: '2', strokeLinecap: 'round', strokeLinejoin: 'round' }, e('path', { d: 'M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7' }), e('path', { d: 'M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z' })),
+    fill:     e('svg', { width: '15', height: '15', viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: '2', strokeLinecap: 'round', strokeLinejoin: 'round' }, e('path', { d: 'M19 11c0 4-7 11-7 11S5 15 5 11a7 7 0 0 1 14 0z' }), e('circle', { cx: '12', cy: '11', r: '1', fill: 'currentColor' })),
+    // Grupo B: Historial
+    undo:     e('svg', { width: '15', height: '15', viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: '2', strokeLinecap: 'round', strokeLinejoin: 'round' }, e('polyline', { points: '9 14 4 9 9 4' }), e('path', { d: 'M20 20v-7a4 4 0 0 0-4-4H4' })),
+    redo:     e('svg', { width: '15', height: '15', viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: '2', strokeLinecap: 'round', strokeLinejoin: 'round' }, e('polyline', { points: '15 14 20 9 15 4' }), e('path', { d: 'M4 20v-7a4 4 0 0 1 4-4h12' })),
+    // Grupo C: Transformación
+    mirrorH:  e('svg', { width: '15', height: '15', viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: '2', strokeLinecap: 'round', strokeLinejoin: 'round' }, e('path', { d: 'M12 3v18' }), e('polyline', { points: '5 8 1 12 5 16' }), e('polyline', { points: '19 8 23 12 19 16' })),
+    mirrorV:  e('svg', { width: '15', height: '15', viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: '2', strokeLinecap: 'round', strokeLinejoin: 'round' }, e('path', { d: 'M3 12h18' }), e('polyline', { points: '8 5 12 1 16 5' }), e('polyline', { points: '8 19 12 23 16 19' })),
+    invert:   e('svg', { width: '15', height: '15', viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: '2', strokeLinecap: 'round', strokeLinejoin: 'round' }, e('circle', { cx: '12', cy: '12', r: '9' }), e('path', { d: 'M12 3v18', strokeDasharray: '0' }), e('path', { d: 'M12 3a9 9 0 0 1 0 18z', fill: 'currentColor', stroke: 'none' })),
+    // Grupo D: Movimiento (mismo estilo de flecha sólida en todos)
+    arrowUp:    e('svg', { width: '13', height: '13', viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: '2.2', strokeLinecap: 'round', strokeLinejoin: 'round' }, e('line', { x1: '12', y1: '19', x2: '12', y2: '5' }), e('polyline', { points: '5 12 12 5 19 12' })),
+    arrowDown:  e('svg', { width: '13', height: '13', viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: '2.2', strokeLinecap: 'round', strokeLinejoin: 'round' }, e('line', { x1: '12', y1: '5', x2: '12', y2: '19' }), e('polyline', { points: '19 12 12 19 5 12' })),
+    arrowLeft:  e('svg', { width: '13', height: '13', viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: '2.2', strokeLinecap: 'round', strokeLinejoin: 'round' }, e('line', { x1: '19', y1: '12', x2: '5', y2: '12' }), e('polyline', { points: '12 19 5 12 12 5' })),
+    arrowRight: e('svg', { width: '13', height: '13', viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: '2.2', strokeLinecap: 'round', strokeLinejoin: 'round' }, e('line', { x1: '5', y1: '12', x2: '19', y2: '12' }), e('polyline', { points: '12 5 19 12 12 19' })),
+    // Grupo E: Gestión
+    copy:     e('svg', { width: '15', height: '15', viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: '2', strokeLinecap: 'round', strokeLinejoin: 'round' }, e('rect', { x: '9', y: '9', width: '13', height: '13', rx: '2' }), e('path', { d: 'M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1' })),
+    paste:    e('svg', { width: '15', height: '15', viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: '2', strokeLinecap: 'round', strokeLinejoin: 'round' }, e('path', { d: 'M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2' }), e('rect', { x: '8', y: '2', width: '8', height: '4', rx: '1' })),
+    trash:    e('svg', { width: '15', height: '15', viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: '2', strokeLinecap: 'round', strokeLinejoin: 'round' }, e('polyline', { points: '3 6 5 6 21 6' }), e('path', { d: 'M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6' }), e('path', { d: 'M10 11v6' }), e('path', { d: 'M14 11v6' }), e('path', { d: 'M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2' })),
+  };
+
+  // Grupos de herramientas
+  const editTools   = [
+    { id: 'pencil',   icon: IC.pencil,  tooltip: 'Lápiz (P)',           isMode: true },
+    { id: 'fill',     icon: IC.fill,    tooltip: 'Relleno (F)',          isMode: true },
   ];
-  const actionTools = [
-    { iconName: 'arrow-left',  tooltip: 'Deshacer (Ctrl+Z)', fn: onUndo },
-    { iconName: 'arrow-right', tooltip: 'Rehacer (Ctrl+Y)', fn: onRedo },
-    { iconName: 'invert',      tooltip: 'Invertir (Ctrl+I)', fn: onInvert },
-    { iconName: 'arrow-up',    tooltip: 'Subir (↑)', fn: () => onShift('up') },
-    { iconName: 'arrow-down',  tooltip: 'Bajar (↓)', fn: () => onShift('down') },
-    { iconName: 'mirror-h',    tooltip: 'Izquierda (←)', fn: () => onShift('left') },
-    { iconName: 'mirror-v',    tooltip: 'Derecha (→)', fn: () => onShift('right') },
+  const transformTools = [
+    { id: 'mirror-h', icon: IC.mirrorH, tooltip: 'Espejo H (H)',        isMode: true },
+    { id: 'mirror-v', icon: IC.mirrorV, tooltip: 'Espejo V (V)',        isMode: true },
+    { id: '_invert',  icon: IC.invert,  tooltip: 'Invertir (Ctrl+I)',   isMode: false, fn: onInvert },
   ];
-  const onCopyGlyph = useCallback(() => setClipboard([...grid]), [grid]);
-  const onPaste     = useCallback(() => { if (clipboard) onPasteGlyph?.(clipboard); }, [clipboard, onPasteGlyph]);
-  const toolbarBase = { padding: '7px', borderRadius: R_BTN, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '3px', minWidth: '34px', fontFamily: FONT_MONO, border: '1px solid var(--border)', transition: 'all .13s' };
+
+  // Estilos base compartidos
+  const btnBase   = { ...toolbarBase, background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--muted)' };
+  const btnActive = { ...toolbarBase, background: ACCENT, border: `1px solid ${ACCENT}`, color: '#fff', boxShadow: `0 2px 8px ${ACCENT}40` };
+  const divider   = e('div', { style: { width: '1px', height: '28px', background: 'var(--border)', margin: '0 5px', flexShrink: 0 } });
+
+  // Helper: botón de acción (sin estado activo)
+  const ActionBtn = ({ tooltip, icon, onClick, style: extraStyle = {}, disabled = false }) =>
+    e(Tooltip, { label: tooltip, placement: 'bottom' },
+      e('button', {
+        onClick, disabled,
+        style: { ...btnBase, ...extraStyle, opacity: disabled ? .35 : 1, cursor: disabled ? 'not-allowed' : 'pointer' },
+        onMouseEnter: ev => { if (!disabled) { ev.currentTarget.style.background = 'var(--surface3)'; ev.currentTarget.style.borderColor = 'var(--border2)'; } },
+        onMouseLeave: ev => { if (!disabled) { ev.currentTarget.style.background = 'var(--surface)';  ev.currentTarget.style.borderColor = 'var(--border)'; } },
+      }, icon)
+    );
 
   // ─────────────────────────────────────────────
   //  RENDER
@@ -876,45 +915,77 @@ export function EditorPage({
           ),
         ),
 
-        // Toolbar
-        e('div', { style: { display: 'flex', gap: '1px', alignItems: 'center', flexWrap: 'wrap', padding: '6px', background: 'var(--surface2)', borderRadius: R_CARD, border: '1px solid var(--border)', width: '100%' } },
-          ...modeTools.map(t =>
+        // ── Toolbar — 5 grupos separados por divisores ──────────
+        e('div', {
+          style: {
+            display: 'flex', gap: '2px', alignItems: 'center', flexWrap: 'wrap',
+            padding: '5px 8px', background: 'var(--surface2)', borderRadius: R_CARD,
+            border: '1px solid var(--border)', width: '100%', boxSizing: 'border-box',
+          }
+        },
+
+          // ── Grupo A: Edición Básica ─────────────
+          ...editTools.map(t =>
             e(Tooltip, { key: t.id, label: t.tooltip, placement: 'bottom' },
-              e('button', { onClick: () => setTool(t.id), style: { ...toolbarBase, background: tool === t.id ? ACCENT : 'var(--surface)', color: tool === t.id ? '#fff' : 'var(--muted)', boxShadow: tool === t.id ? `0 2px 8px ${ACCENT}40` : 'none', borderColor: tool === t.id ? ACCENT : 'var(--border)' } },
-                e('img', { src: `./src/icons/${t.iconName}.svg`, style: { width: '16px', height: '16px', filter: tool === t.id ? 'invert(1)' : 'var(--icon-filter)', opacity: tool === t.id ? 1 : .65 } })
-              )
+              e('button', {
+                onClick: () => setTool(t.id),
+                style: tool === t.id ? btnActive : btnBase,
+                onMouseEnter: ev => { if (tool !== t.id) { ev.currentTarget.style.background = 'var(--surface3)'; ev.currentTarget.style.borderColor = 'var(--border2)'; } },
+                onMouseLeave: ev => { if (tool !== t.id) { ev.currentTarget.style.background = 'var(--surface)';  ev.currentTarget.style.borderColor = 'var(--border)'; } },
+              }, t.icon)
             )
           ),
-          e('div', { style: { width: '1px', height: '40px', background: 'var(--border)', margin: '0 3px' } }),
-          ...actionTools.map((t, i) =>
-            e(Tooltip, { key: i, label: t.tooltip, placement: 'bottom' },
-              e('button', { onClick: t.fn, style: { ...toolbarBase, background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--muted)' }, onMouseEnter: ev => { ev.currentTarget.style.background = 'var(--surface3)'; ev.currentTarget.style.borderColor = 'var(--border2)'; }, onMouseLeave: ev => { ev.currentTarget.style.background = 'var(--surface)'; ev.currentTarget.style.borderColor = 'var(--border)'; } },
-                e('img', { src: `./src/icons/${t.iconName}.svg`, style: { width: '16px', height: '16px', filter: 'var(--icon-filter)', opacity: .65 } })
-              )
-            )
+
+          divider,
+
+          // ── Grupo B: Historial ──────────────────
+          e(ActionBtn, { tooltip: 'Deshacer (Ctrl+Z)', icon: IC.undo, onClick: onUndo }),
+          e(ActionBtn, { tooltip: 'Rehacer (Ctrl+Y)',  icon: IC.redo, onClick: onRedo }),
+
+          divider,
+
+          // ── Grupo C: Transformación y Espejo ────
+          ...transformTools.map(t =>
+            t.isMode
+              ? e(Tooltip, { key: t.id, label: t.tooltip, placement: 'bottom' },
+                  e('button', {
+                    onClick: () => setTool(t.id),
+                    style: tool === t.id ? btnActive : btnBase,
+                    onMouseEnter: ev => { if (tool !== t.id) { ev.currentTarget.style.background = 'var(--surface3)'; ev.currentTarget.style.borderColor = 'var(--border2)'; } },
+                    onMouseLeave: ev => { if (tool !== t.id) { ev.currentTarget.style.background = 'var(--surface)';  ev.currentTarget.style.borderColor = 'var(--border)'; } },
+                  }, t.icon)
+                )
+              : e(ActionBtn, { key: t.id, tooltip: t.tooltip, icon: t.icon, onClick: t.fn })
           ),
-          e('div', { style: { width: '1px', height: '40px', background: 'var(--border)', margin: '0 3px' } }),
-          e(Tooltip, { label: 'Limpiar glifo (Delete)', placement: 'bottom' },
-            e('button', { onClick: onClearCanvas, style: { ...toolbarBase, background: 'rgba(191,69,69,0.07)', border: '1px solid rgba(191,69,69,0.2)', color: ACCENT }, onMouseEnter: ev => { ev.currentTarget.style.background = 'rgba(191,69,69,0.14)'; }, onMouseLeave: ev => { ev.currentTarget.style.background = 'rgba(191,69,69,0.07)'; } },
-              e('img', { src: './src/icons/delete.svg', style: { width: '16px', height: '16px', opacity: .7 } })
-            )
+
+          divider,
+
+          // ── Grupo D: Movimiento — más compacto ──
+          e('div', { style: { display: 'flex', gap: '1px', alignItems: 'center' } },
+            e(ActionBtn, { tooltip: 'Subir (↑)',      icon: IC.arrowUp,    onClick: () => onShift('up') }),
+            e(ActionBtn, { tooltip: 'Bajar (↓)',      icon: IC.arrowDown,  onClick: () => onShift('down') }),
+            e(ActionBtn, { tooltip: 'Izquierda (←)',  icon: IC.arrowLeft,  onClick: () => onShift('left') }),
+            e(ActionBtn, { tooltip: 'Derecha (→)',    icon: IC.arrowRight, onClick: () => onShift('right') }),
           ),
-          e('div', { style: { width: '1px', height: '40px', background: 'var(--border)', margin: '0 3px' } }),
-          e(Tooltip, { label: 'Copiar glifo (Ctrl+C)', placement: 'bottom' },
-            e('button', { onClick: onCopyGlyph, style: { ...toolbarBase, background: 'var(--surface)' } },
-              e('svg', { width: '15', height: '15', viewBox: '0 0 24 24', fill: 'none', stroke: 'var(--muted)', strokeWidth: '2', strokeLinecap: 'round', strokeLinejoin: 'round' },
-                e('rect', { x: '9', y: '9', width: '13', height: '13', rx: '2', ry: '2' }),
-                e('path', { d: 'M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1' })
-              )
-            )
-          ),
-          e(Tooltip, { label: clipboard ? 'Pegar glifo (Ctrl+V)' : 'Portapapeles vacío', placement: 'bottom' },
-            e('button', { onClick: onPaste, style: { ...toolbarBase, background: 'var(--surface)', opacity: clipboard ? 1 : .4, cursor: clipboard ? 'pointer' : 'not-allowed' } },
-              e('svg', { width: '15', height: '15', viewBox: '0 0 24 24', fill: 'none', stroke: 'var(--muted)', strokeWidth: '2', strokeLinecap: 'round', strokeLinejoin: 'round' },
-                e('path', { d: 'M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2' }),
-                e('rect', { x: '8', y: '2', width: '8', height: '4', rx: '1', ry: '1' })
-              )
-            )
+
+          divider,
+
+          // ── Grupo E: Gestión del glifo ──────────
+          e(ActionBtn, { tooltip: 'Copiar glifo (Ctrl+C)', icon: IC.copy,  onClick: onCopyGlyph }),
+          e(ActionBtn, {
+            tooltip:  clipboard ? 'Pegar glifo (Ctrl+V)' : 'Portapapeles vacío',
+            icon:     IC.paste,
+            onClick:  onPaste,
+            disabled: !clipboard,
+          }),
+          // Eliminar al final para evitar clics accidentales
+          e(Tooltip, { label: 'Eliminar glifo (Delete)', placement: 'bottom' },
+            e('button', {
+              onClick: onClearCanvas,
+              style: { ...toolbarBase, background: 'rgba(191,69,69,0.07)', border: '1px solid rgba(191,69,69,0.22)', color: ACCENT, cursor: 'pointer' },
+              onMouseEnter: ev => { ev.currentTarget.style.background = 'rgba(191,69,69,0.16)'; ev.currentTarget.style.borderColor = 'rgba(191,69,69,0.45)'; },
+              onMouseLeave: ev => { ev.currentTarget.style.background = 'rgba(191,69,69,0.07)'; ev.currentTarget.style.borderColor = 'rgba(191,69,69,0.22)'; },
+            }, IC.trash)
           )
         ),
 
