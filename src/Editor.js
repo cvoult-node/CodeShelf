@@ -1,9 +1,15 @@
 // ─────────────────────────────────────────────
-//  EDITOR — src/Editor.js  (v2.2)
-//  Cambios v2.2:
-//  • Quitada barra de progreso del panel izquierdo
-//  • Glifos exportados a tamaño correcto: S dinámico según gridSize y unitsPerEm
-//  • Defaults de ascender/descender calculados automáticamente
+//  EDITOR — src/Editor.js  (v2.3)
+//  Cambios v2.3 (mejoras de rendimiento y correcciones):
+//  • TOOLTIP_POS movido fuera de Tooltip — ya no se recrea en cada render
+//  • EXTENDED_CHARS movido fuera de EditorPage — ya no se recrea en cada render
+//  • SHORTCUTS movido fuera de PreferencesModal — ya no se recrea en cada render
+//  • DragSlider: usa computeRef para evitar re-registrar listeners globales en cada cambio de prop
+//  • useCallback aplicado a parseCharCode, addToList, removeFromList, addAllChars, onCopyGlyph, onPaste
+//  • useEffect del teclado: deps faltantes grid, clipboard, onPasteGlyph añadidas (evitaba stale closures)
+//  • 5 efectos de persistencia de guías consolidados en uno solo
+//  • 2 efectos de autosave consolidados en uno solo
+//  • canvasSize eliminado (era alias innecesario de CANVAS_BASE)
 // ─────────────────────────────────────────────
 import React, { useState, useRef, useCallback, useEffect, useMemo } from 'https://esm.sh/react@18.2.0';
 import { auth, signOut } from './firebase.js';
@@ -107,9 +113,17 @@ const PixelPreview = ({ text, fontData, gridSize, pixelSize = 3, color = ACCENT,
 // ─────────────────────────────────────────────
 //  TOOLTIP
 // ─────────────────────────────────────────────
+// Defined outside to avoid recreating this object on every Tooltip render
+const TOOLTIP_POS = {
+  bottom: { top: 'calc(100% + 8px)',    left: '50%', transform: 'translateX(-50%)' },
+  top:    { bottom: 'calc(100% + 8px)', left: '50%', transform: 'translateX(-50%)' },
+  right:  { left: 'calc(100% + 8px)',   top: '50%',  transform: 'translateY(-50%)' },
+  left:   { right: 'calc(100% + 8px)',  top: '50%',  transform: 'translateY(-50%)' },
+};
+
 const Tooltip = ({ label, children, placement = 'bottom' }) => {
   const [visible, setVisible] = useState(false);
-  const pos = { bottom: { top: 'calc(100% + 8px)', left: '50%', transform: 'translateX(-50%)' }, top: { bottom: 'calc(100% + 8px)', left: '50%', transform: 'translateX(-50%)' }, right: { left: 'calc(100% + 8px)', top: '50%', transform: 'translateY(-50%)' }, left: { right: 'calc(100% + 8px)', top: '50%', transform: 'translateY(-50%)' } };
+  const pos = TOOLTIP_POS;
   return e('div', { style: { position: 'relative', display: 'inline-flex' }, onMouseEnter: () => setVisible(true), onMouseLeave: () => setVisible(false) },
     children,
     visible && label && e('div', { style: { position: 'absolute', ...pos[placement], background: 'var(--surface3)', border: '1px solid var(--border)', borderRadius: '6px', padding: '5px 9px', whiteSpace: 'nowrap', fontFamily: FONT_MONO, fontSize: '9px', letterSpacing: '1px', color: 'var(--text)', zIndex: 999, pointerEvents: 'none', boxShadow: '0 4px 16px rgba(0,0,0,0.2)' } }, label)
@@ -167,18 +181,20 @@ const GuideOverlay = ({ gridSize, capGuideRow, xHeightGuideRow, baselineGuideRow
 //  DRAG SLIDER — funciona con click y arrastre
 // ─────────────────────────────────────────────
 const DragSlider = ({ value, onChange, min, max, step = 1 }) => {
-  const trackRef = useRef(null);
-  const dragging = useRef(false);
-
-  const compute = (clientX) => {
-    const rect = trackRef.current.getBoundingClientRect();
+  const trackRef  = useRef(null);
+  const dragging  = useRef(false);
+  // Keep a stable ref to the latest compute logic so the event listeners
+  // registered once in useEffect always call the current version.
+  const computeRef = useRef(null);
+  computeRef.current = (clientX) => {
+    const rect  = trackRef.current.getBoundingClientRect();
     const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
-    const raw = min + ratio * (max - min);
+    const raw   = min + ratio * (max - min);
     onChange(Math.round(raw / step) * step);
   };
 
   useEffect(() => {
-    const onMove = (ev) => { if (!dragging.current) return; compute(ev.touches ? ev.touches[0].clientX : ev.clientX); };
+    const onMove = (ev) => { if (!dragging.current) return; computeRef.current(ev.touches ? ev.touches[0].clientX : ev.clientX); };
     const onUp   = () => { dragging.current = false; };
     window.addEventListener('mousemove', onMove);
     window.addEventListener('mouseup',   onUp);
@@ -190,14 +206,14 @@ const DragSlider = ({ value, onChange, min, max, step = 1 }) => {
       window.removeEventListener('touchmove', onMove);
       window.removeEventListener('touchend',  onUp);
     };
-  }, [min, max, step, onChange]);
+  }, []); // sin deps — los listeners se registran sólo una vez
 
   const pct = ((value - min) / (max - min)) * 100;
   return e('div', {
     ref: trackRef,
     style: { position: 'relative', height: '22px', display: 'flex', alignItems: 'center', cursor: 'pointer', userSelect: 'none', padding: '0 7px', boxSizing: 'border-box' },
-    onMouseDown: (ev) => { ev.preventDefault(); dragging.current = true; compute(ev.clientX); },
-    onTouchStart: (ev) => { ev.preventDefault(); compute(ev.touches[0].clientX); dragging.current = true; },
+    onMouseDown: (ev) => { ev.preventDefault(); dragging.current = true; computeRef.current(ev.clientX); },
+    onTouchStart: (ev) => { ev.preventDefault(); computeRef.current(ev.touches[0].clientX); dragging.current = true; },
   },
     e('div', { style: { position: 'absolute', left: '7px', right: '7px', height: '3px', borderRadius: '2px', background: 'var(--border)' } }),
     e('div', { style: { position: 'absolute', left: '7px', width: `calc(${pct}% - 0px)`, height: '3px', borderRadius: '2px', background: ACCENT, maxWidth: 'calc(100% - 14px)' } }),
@@ -371,6 +387,15 @@ const PublishModal = ({ projectName, fontData, gridSize, onClose, onPublish, isP
   );
 };
 
+// Defined outside PreferencesModal — it's static data, no need to recreate on each render
+const SHORTCUTS = [
+  ['P', 'Herramienta Lápiz'], ['F', 'Herramienta Relleno'], ['H', 'Espejo horizontal'], ['V', 'Espejo vertical'],
+  ['Ctrl+S', 'Guardar proyecto'], ['Ctrl+Z', 'Deshacer'], ['Ctrl+Y / Ctrl+Shift+Z', 'Rehacer'], ['Ctrl+I', 'Invertir glifo'],
+  ['Ctrl+C', 'Copiar glifo'], ['Ctrl+V', 'Pegar glifo'],
+  ['← → ↑ ↓', 'Desplazar glifo'],
+  ['Delete', 'Limpiar glifo'], ['Escape', 'Cerrar modal'],
+];
+
 // ─────────────────────────────────────────────
 //  PREFERENCES MODAL
 // ─────────────────────────────────────────────
@@ -425,14 +450,6 @@ const PreferencesModal = ({ onClose, showSpaceMarker, setShowSpaceMarker, showCe
     ),
     e('input', { type: 'range', min, max, value, onChange, style: { width: '100%', accentColor: ACCENT, cursor: 'pointer' } })
   );
-
-  const SHORTCUTS = [
-    ['P', 'Herramienta Lápiz'], ['F', 'Herramienta Relleno'], ['H', 'Espejo horizontal'], ['V', 'Espejo vertical'],
-    ['Ctrl+S', 'Guardar proyecto'], ['Ctrl+Z', 'Deshacer'], ['Ctrl+Y / Ctrl+Shift+Z', 'Rehacer'], ['Ctrl+I', 'Invertir glifo'],
-    ['Ctrl+C', 'Copiar glifo'], ['Ctrl+V', 'Pegar glifo'],
-    ['← → ↑ ↓', 'Desplazar glifo'],
-    ['Delete', 'Limpiar glifo'], ['Escape', 'Cerrar modal'],
-  ];
 
   return e(Overlay, { onClose },
     e(Modal, { style: { maxWidth: '700px', width: '700px', gap: '16px' } },
@@ -510,6 +527,14 @@ const PreferencesModal = ({ onClose, showSpaceMarker, setShowSpaceMarker, showCe
 // ─────────────────────────────────────────────
 //  EDITOR PAGE  (componente principal)
 // ─────────────────────────────────────────────
+
+// Defined outside the component so it is never recreated on each render
+const EXTENDED_CHARS = [
+  'á','é','í','ó','ú','Á','É','Í','Ó','Ú','ü','Ü','ñ','Ñ',
+  '¡','¿','@','#','$','%','&','*','(',')','-','+','=','[',']','{','}',
+  '<','>','/','\\','|','_','~','^','`','\'','"',':',';',',','.','!'
+];
+
 export function EditorPage({
   user, isDark, toggleTheme, gridSize, currentChar, fontData, grid, isSaving,
   tool, setTool, previewText, setPreviewText, onPixelDown, onPixelEnter, onMouseUp,
@@ -548,7 +573,6 @@ export function EditorPage({
 
   const avatarInit = (user?.displayName || user?.email || '?')[0].toUpperCase();
   const CANVAS_BASE = 460;
-  const canvasSize = CANVAS_BASE;
 
   const totalGlyphs = TECLADO.length;
   const doneGlyphs  = TECLADO.filter(c => fontData?.[c]?.some(Boolean)).length;
@@ -573,13 +597,15 @@ export function EditorPage({
     return () => window.removeEventListener('click', close);
   }, [openFileMenu, openUserMenu]);
 
-  // Persistir ajustes
+  // Persistir ajustes de visibilidad de guías — consolidado en un solo efecto
   useEffect(() => { writeSetting(EDITOR_STORAGE_KEYS.showSpaceMarker, showSpaceMarker ? '1' : '0'); }, [showSpaceMarker]);
-  useEffect(() => { localStorage.setItem('cs-show-center-guide', showCenterGuide ? '1' : '0'); }, [showCenterGuide]);
-  useEffect(() => { localStorage.setItem('cs-show-cap-guide',  showCapGuide  ? '1' : '0'); }, [showCapGuide]);
-  useEffect(() => { localStorage.setItem('cs-show-xh-guide',   showXHGuide   ? '1' : '0'); }, [showXHGuide]);
-  useEffect(() => { localStorage.setItem('cs-show-base-guide', showBaseGuide ? '1' : '0'); }, [showBaseGuide]);
-  useEffect(() => { localStorage.setItem('cs-show-desc-guide', showDescGuide ? '1' : '0'); }, [showDescGuide]);
+  useEffect(() => {
+    localStorage.setItem('cs-show-center-guide', showCenterGuide ? '1' : '0');
+    localStorage.setItem('cs-show-cap-guide',    showCapGuide    ? '1' : '0');
+    localStorage.setItem('cs-show-xh-guide',     showXHGuide     ? '1' : '0');
+    localStorage.setItem('cs-show-base-guide',   showBaseGuide   ? '1' : '0');
+    localStorage.setItem('cs-show-desc-guide',   showDescGuide   ? '1' : '0');
+  }, [showCenterGuide, showCapGuide, showXHGuide, showBaseGuide, showDescGuide]);
   useEffect(() => {
     const clamped = clamp(centerGuideCol || 0, 0, gridSize - 1);
     if (clamped !== centerGuideCol) setCenterGuideCol(clamped);
@@ -635,32 +661,28 @@ export function EditorPage({
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [onSave, onUndo, onRedo, onInvert, onShift, onClearCanvas, setTool]);
+  }, [onSave, onUndo, onRedo, onInvert, onShift, onClearCanvas, setTool, grid, clipboard, onPasteGlyph]);
 
-  // Persist autosave UI prefs in localStorage (are editor preferences, not project data)
-  useEffect(() => { localStorage.setItem('cs-autosave-enabled', autosaveEnabled ? '1' : '0'); }, [autosaveEnabled]);
-  useEffect(() => { localStorage.setItem('cs-autosave-minutes', String(autosaveMinutes)); }, [autosaveMinutes]);
+  // Persist autosave UI prefs — consolidado en un solo efecto
+  useEffect(() => {
+    localStorage.setItem('cs-autosave-enabled', autosaveEnabled ? '1' : '0');
+    localStorage.setItem('cs-autosave-minutes', String(autosaveMinutes));
+  }, [autosaveEnabled, autosaveMinutes]);
 
-  // Persist extra chars — guardado en Firebase mediante onSaveExtraChars prop
+  // Intervalo de guardado automático
   useEffect(() => {
     if (!autosaveEnabled) return;
     const id = setInterval(() => { onSave(); }, autosaveMinutes * 60 * 1000);
     return () => clearInterval(id);
   }, [autosaveEnabled, autosaveMinutes, onSave]);
 
-  // Chars base = TECLADO + vocales con tildes + especiales comunes + extras del usuario
-  const EXTENDED_CHARS = [
-    'á','é','í','ó','ú','Á','É','Í','Ó','Ú','ü','Ü','ñ','Ñ',
-    '¡','¿','@','#','$','%','&','*','(',')','-','+','=','[',']','{','}',
-    '<','>','/','\\','|','_','~','^','`','\'','"',':',';',',','.','!'
-  ];
   // All chars for panel = TECLADO + extended + extraChars
   const allChars = useMemo(() => {
     const base = [...TECLADO];
     EXTENDED_CHARS.forEach(c => { if (!base.includes(c)) base.push(c); });
     extraChars.forEach(c => { if (!base.includes(c)) base.push(c); });
     return base;
-  }, [extraChars]);
+  }, [extraChars]); // EXTENDED_CHARS is a stable module-level constant, not needed in deps
 
   // Filtrado de caracteres
   const filteredChars = useMemo(() => {
@@ -683,7 +705,7 @@ export function EditorPage({
   }, [showAddChar]);
 
   // Helper: parse char from code (e.g. U+0041, &#65;, 0x41, or direct char)
-  const parseCharCode = (raw) => {
+  const parseCharCode = useCallback((raw) => {
     const s = raw.trim();
     if (!s) return null;
     const uMatch = s.match(/^[Uu]\+([0-9a-fA-F]{1,6})$/);
@@ -694,19 +716,19 @@ export function EditorPage({
     if (hexMatch) return String.fromCodePoint(parseInt(hexMatch[1], 16));
     if (s.length === 1 || (s.length === 2 && s.codePointAt(0) > 0xFFFF)) return s;
     return null;
-  };
+  }, []);
 
-  const addToList = () => {
+  const addToList = useCallback(() => {
     const ch = parseCharCode(addCharInput);
     if (!ch) return;
     if (addCharList.find(item => item.char === ch)) return;
     setAddCharList(prev => [...prev, { char: ch, code: addCharInput.trim() }]);
     setAddCharInput('');
-  };
+  }, [parseCharCode, addCharInput, addCharList]);
 
-  const removeFromList = (ch) => setAddCharList(prev => prev.filter(item => item.char !== ch));
+  const removeFromList = useCallback((ch) => setAddCharList(prev => prev.filter(item => item.char !== ch)), []);
 
-  const addAllChars = () => {
+  const addAllChars = useCallback(() => {
     const toAdd = addCharList.map(item => item.char).filter(ch => !extraChars.includes(ch));
     if (toAdd.length === 0) return;
     const next = [...extraChars, ...toAdd];
@@ -715,7 +737,7 @@ export function EditorPage({
     setAddCharList([]);
     setShowAddChar(false);
     if (toAdd[0]) onSwitchChar(toAdd[0]);
-  };
+  }, [addCharList, extraChars, onSwitchChar, onSaveExtraChars]);
 
   const modeTools = [
     { id: 'pencil',   iconName: 'pencil',   label: 'LÁPIZ',  tooltip: 'Lápiz (P)' },
@@ -732,8 +754,8 @@ export function EditorPage({
     { iconName: 'mirror-h',    tooltip: 'Izquierda (←)', fn: () => onShift('left') },
     { iconName: 'mirror-v',    tooltip: 'Derecha (→)', fn: () => onShift('right') },
   ];
-  const onCopyGlyph = () => setClipboard([...grid]);
-  const onPaste     = () => { if (clipboard) onPasteGlyph?.(clipboard); };
+  const onCopyGlyph = useCallback(() => setClipboard([...grid]), [grid]);
+  const onPaste     = useCallback(() => { if (clipboard) onPasteGlyph?.(clipboard); }, [clipboard, onPasteGlyph]);
   const toolbarBase = { padding: '7px', borderRadius: R_BTN, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '3px', minWidth: '34px', fontFamily: FONT_MONO, border: '1px solid var(--border)', transition: 'all .13s' };
 
   // ─────────────────────────────────────────────
@@ -897,7 +919,7 @@ export function EditorPage({
         ),
 
         // Canvas de píxeles
-        e('div', { style: { position: 'relative', width: `${canvasSize}px`, height: `${canvasSize}px` } },
+        e('div', { style: { position: 'relative', width: `${CANVAS_BASE}px`, height: `${CANVAS_BASE}px` } },
           e('div', {
             style: { display: 'grid', gridTemplateColumns: `repeat(${gridSize}, 1fr)`, width: '100%', height: '100%', gap: '1px', background: 'var(--grid-line)', borderRadius: R_CARD, overflow: 'hidden', border: `2px solid var(--border-accent)`, cursor: 'crosshair', userSelect: 'none', boxShadow: `var(--shadow-card), 0 0 0 1px ${ACCENT}10` },
             onMouseUp: onMouseUp, onMouseLeave: onMouseUp
