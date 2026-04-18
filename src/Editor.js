@@ -42,16 +42,16 @@ const PixelPreview = ({ text, fontData, gridSize, pixelSize = 3, color = ACCENT,
       const glyph = fontData[ch];
       const bounds = getBounds(glyph);
       const isSpace = ch === ' ';
-      const spacingPx = isSpace ? wordSpacing * 0.22 : letterSpacing * pixelSize;
-      const minSpaceWidth = Math.max(pixelSize * 2, 1);
-      const computedSpaceWidth = Math.max(minSpaceWidth, pixelSize * 3 + wordSpacing * 0.2);
+      const spacingPx = isSpace ? wordSpacing * 0.22 : letterSpacing * ;
+      const minSpaceWidth = Math.max( * 2, 1);
+      const computedSpaceWidth = Math.max(minSpaceWidth,  * 3 + wordSpacing * 0.2);
       const glyphCols = bounds ? (bounds.maxCol - bounds.minCol + 1) : sz;
       const glyphRows = sz;
 
       return e('div', {
         key: ci,
         style: {
-          display: 'grid', gridTemplateColumns: `repeat(${glyphCols},${pixelSize}px)`, gridTemplateRows: `repeat(${glyphRows},${pixelSize}px)`,
+          display: 'grid', gridTemplateColumns: `repeat(${glyphCols},${}px)`, gridTemplateRows: `repeat(${glyphRows},${pixelSize}px)`,
           position: 'relative', width: isSpace ? `${computedSpaceWidth}px` : undefined, minWidth: isSpace ? `${minSpaceWidth}px` : undefined,
           marginRight: `${spacingPx}px`, border: (isSpace && showSpaceMarker) ? '1px dashed var(--border)' : 'none',
           borderRadius: '4px', padding: (isSpace && showSpaceMarker) ? '2px' : 0, flexShrink: 0, alignSelf: 'flex-end'
@@ -149,7 +149,7 @@ const ExportModal = ({ projectName, fontData, gridSize, previewText: extText, on
       ),
       e('div', { style: { background: 'var(--surface2)', border: '1px solid var(--border2)', borderRadius: R_BTN, padding: '14px', minHeight: '100px' } },
         e('div', { style: { fontFamily: FONT_MONO, fontSize: '8px', color: 'var(--muted2)', letterSpacing: '2px', marginBottom: '10px' } }, 'PREVIEW'),
-        e(PixelPreview, { text: extText || 'Lorem ipsum', fontData, gridSize, pixelSize: 7, color: ACCENT, letterSpacing, wordSpacing })
+        e(PixelPreview, { text: extText || 'Lorem ipsum', fontData, gridSize, pixelSize: 5, color: ACCENT, letterSpacing, wordSpacing })
       ),
       e(Field, { label: 'NOMBRE DEL ARCHIVO' }, e('input', { value: filename, onChange: ev => setFilename(ev.target.value), style: inputStyle, onFocus: ev => ev.target.style.borderColor = ACCENT, onBlur: ev => ev.target.style.borderColor = 'var(--border)' })),
       e(Field, { label: 'NOMBRE DE LA FAMILIA' }, e('input', { value: fontName, onChange: ev => setFontName(ev.target.value), style: inputStyle, onFocus: ev => ev.target.style.borderColor = ACCENT, onBlur: ev => ev.target.style.borderColor = 'var(--border)' })),
