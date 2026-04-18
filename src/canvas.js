@@ -65,9 +65,11 @@ export function buildAndDownload(fontData, gridSize, filename, format, meta = {}
   const {
     fontName      = filename,
     author        = '',
+    license       = '',
     letterSpacing = 0,
-    wordSpacing   = 10,
+    wordSpacing   = 6,
     extraSpace    = 1,
+    lineGap       = 0,
     unitsPerEm    = 1000,
     ascender      = 800,
     descender     = -250,
@@ -75,12 +77,11 @@ export function buildAndDownload(fontData, gridSize, filename, format, meta = {}
 
   // Escala: cada píxel del canvas → S unidades opentype
   // S = 1.0 → el gridSize llena exactamente el em completo
-  const S = Math.round((unitsPerEm * 2) / gridSize);
+  const S = Math.round(unitsPerEm / gridSize);
   const pxSpacing = Math.round(letterSpacing * S);
 
-  // Fila de baseline (0-indexed desde arriba del grid)
-  // Para 12×12: fila 8, dejando filas 9-11 para descenders
-  const baselineRow = getBaselineRow(gridSize);
+  // Fila de baseline: usa la configurada por el usuario si se pasa, si no el default del grid
+  const baselineRow = (meta.baselineRow != null) ? meta.baselineRow : getBaselineRow(gridSize);
 
   const getGlyphBounds = (glyph = []) => {
     let minCol = gridSize, maxCol = -1;
@@ -150,6 +151,7 @@ export function buildAndDownload(fontData, gridSize, filename, format, meta = {}
     familyName:  fontName || filename,
     styleName:   'Regular',
     designer:    author,
+    description: license,
     unitsPerEm,
     ascender,
     descender,

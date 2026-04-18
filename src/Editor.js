@@ -166,81 +166,130 @@ const GuideOverlay = ({ gridSize, capGuideRow, xHeightGuideRow, baselineGuideRow
 // ─────────────────────────────────────────────
 //  EXPORT MODAL
 // ─────────────────────────────────────────────
-const ExportModal = ({ projectName, fontData, gridSize, previewText: extText, onClose, onExport }) => {
-  const [filename, setFilename] = useState(projectName || 'mi-fuente');
-  const [fontName, setFontName] = useState(projectName || 'mi-fuente');
-  const [author, setAuthor] = useState('');
-  const [format, setFormat] = useState('otf');
-  const [letterSpacing, setLetterSpacing] = useState(1);
-  const [wordSpacing, setWordSpacing] = useState(10);
-  const [showAdvanced, setShowAdvanced] = useState(false);
-  const [unitsPerEm, setUnitsPerEm] = useState(1000);
+const ExportModal = ({ projectName, fontData, gridSize, previewText: extText, onClose, onExport, userBaselineRow }) => {
+  const [filename,      setFilename]      = useState(projectName || 'mi-fuente');
+  const [fontName,      setFontName]      = useState(projectName || 'mi-fuente');
+  const [author,        setAuthor]        = useState('');
+  const [format,        setFormat]        = useState('otf');
+  const [letterSpacing, setLetterSpacing] = useState(0);
+  const [wordSpacing,   setWordSpacing]   = useState(6);
+  const [showAdvanced,  setShowAdvanced]  = useState(false);
+  const [unitsPerEm,    setUnitsPerEm]    = useState(1000);
+  const [lineGap,       setLineGap]       = useState(0);
+  const [license,       setLicense]       = useState('');
 
-  // S dinámico = mismo cálculo que canvas.js — glifos llenan ~80% del em
-  const S = Math.round((unitsPerEm * 0.80) / gridSize);
-  const baselineRow = getBaselineRow(gridSize);
-  // ascender: desde baseline hasta arriba del grid, en unidades opentype
-  const defaultAscender = Math.round(baselineRow * S);
+  // Usa la baseline configurada por el usuario (o el default del grid)
+  const baselineRow = userBaselineRow != null ? userBaselineRow : getBaselineRow(gridSize);
+
+  // S = unitsPerEm / gridSize → 1 píxel = S unidades
+  const S = Math.round(unitsPerEm / gridSize);
+  // ascender: filas desde arriba hasta baseline × S
+  const defaultAscender  =  Math.round(baselineRow * S);
   // descender: filas debajo de baseline (negativo)
   const defaultDescender = -Math.round((gridSize - baselineRow) * S);
 
   const [ascender,  setAscender]  = useState(defaultAscender);
   const [descender, setDescender] = useState(defaultDescender);
 
-  const inputStyle = { background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: R_BTN, padding: '10px 13px', color: 'var(--text)', fontSize: '13px', outline: 'none', fontFamily: FONT_MONO, width: '100%', transition: 'border-color .15s' };
+  const inputStyle = { background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: R_BTN, padding: '9px 12px', color: 'var(--text)', fontSize: '12px', outline: 'none', fontFamily: FONT_MONO, width: '100%', transition: 'border-color .15s', boxSizing: 'border-box' };
   const sliderStyle = { width: '100%', accentColor: ACCENT, cursor: 'pointer' };
-  const Field = ({ label, children }) => e('div', { style: { display: 'flex', flexDirection: 'column', gap: '6px' } }, e('label', { style: { fontFamily: FONT_MONO, fontSize: '8px', letterSpacing: '2px', color: 'var(--muted)' } }, label), children);
+  const Field = ({ label, hint, children }) => e('div', { style: { display: 'flex', flexDirection: 'column', gap: '5px' } },
+    e('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' } },
+      e('label', { style: { fontFamily: FONT_MONO, fontSize: '8px', letterSpacing: '2px', color: 'var(--muted)' } }, label),
+      hint && e('span', { style: { fontFamily: FONT_MONO, fontSize: '8px', color: 'var(--muted2)' } }, hint)
+    ),
+    children
+  );
 
   return e(Overlay, { onClose },
-    e('div', { style: { background: 'var(--surface)', border: '1px solid var(--border2)', borderRadius: R_CARD, padding: '28px', width: '540px', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 32px 80px rgba(0,0,0,0.3)', display: 'flex', flexDirection: 'column', gap: '18px' } },
+    e('div', { style: { background: 'var(--surface)', border: '1px solid var(--border2)', borderRadius: R_CARD, padding: '26px', width: '560px', maxHeight: '92vh', overflowY: 'auto', boxShadow: '0 32px 80px rgba(0,0,0,0.4)', display: 'flex', flexDirection: 'column', gap: '16px' } },
+
+      // Header
       e('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' } },
-        e('h3', { style: { fontFamily: FONT_PIXEL, fontSize: '10px', color: ACCENT, letterSpacing: '2px', margin: 0 } }, 'EXPORTAR FUENTE'),
+        e('div', null,
+          e('h3', { style: { fontFamily: FONT_PIXEL, fontSize: '10px', color: ACCENT, letterSpacing: '2px', margin: '0 0 2px' } }, 'EXPORTAR FUENTE'),
+          e('div', { style: { fontFamily: FONT_MONO, fontSize: '9px', color: 'var(--muted2)' } }, `Grid ${gridSize}×${gridSize} · Baseline fila ${baselineRow} · ${S} u/px`)
+        ),
         e('button', { onClick: onClose, style: { background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', fontSize: '20px', lineHeight: 1, padding: '0 4px' } }, '×')
       ),
-      e('div', { style: { background: 'var(--surface2)', border: '1px solid var(--border2)', borderRadius: R_BTN, padding: '14px', minHeight: '100px' } },
-        e('div', { style: { fontFamily: FONT_MONO, fontSize: '8px', color: 'var(--muted2)', letterSpacing: '2px', marginBottom: '10px' } }, 'PREVIEW'),
-        e(PixelPreview, { text: extText || 'Lorem ipsum', fontData, gridSize, pixelSize: 4, color: ACCENT, letterSpacing, wordSpacing, baselineRow: getBaselineRow(gridSize) })
+
+      // Preview
+      e('div', { style: { background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: R_BTN, padding: '12px', minHeight: '60px' } },
+        e('div', { style: { fontFamily: FONT_MONO, fontSize: '8px', color: 'var(--muted2)', letterSpacing: '2px', marginBottom: '8px' } }, 'PREVIEW'),
+        e(PixelPreview, { text: extText || 'Abc 123', fontData, gridSize, pixelSize: 4, color: ACCENT, letterSpacing, wordSpacing, baselineRow })
       ),
-      e(Field, { label: 'NOMBRE DEL ARCHIVO' }, e('input', { value: filename, onChange: ev => setFilename(ev.target.value), style: inputStyle, onFocus: ev => ev.target.style.borderColor = ACCENT, onBlur: ev => ev.target.style.borderColor = 'var(--border)' })),
-      e(Field, { label: 'NOMBRE DE LA FAMILIA' }, e('input', { value: fontName, onChange: ev => setFontName(ev.target.value), style: inputStyle, onFocus: ev => ev.target.style.borderColor = ACCENT, onBlur: ev => ev.target.style.borderColor = 'var(--border)' })),
-      e(Field, { label: 'AUTOR' }, e('input', { value: author, placeholder: 'Tu nombre o seudónimo', onChange: ev => setAuthor(ev.target.value), style: inputStyle, onFocus: ev => ev.target.style.borderColor = ACCENT, onBlur: ev => ev.target.style.borderColor = 'var(--border)' })),
-      e(Field, { label: 'LETTER SPACING (px canvas)' },
-        e('div', { style: { display: 'flex', flexDirection: 'column', gap: '6px' } },
-          e('div', { style: { display: 'flex', justifyContent: 'space-between' } }, e('span', { style: { fontFamily: FONT_MONO, fontSize: '9px', color: 'var(--muted2)' } }, '1px ≈ 10 unidades'), e('span', { style: { fontFamily: FONT_MONO, fontSize: '12px', color: ACCENT } }, `${letterSpacing} px`)),
+
+      // Nombres
+      e('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' } },
+        e(Field, { label: 'NOMBRE DEL ARCHIVO' }, e('input', { value: filename, onChange: ev => setFilename(ev.target.value), style: inputStyle, onFocus: ev => ev.target.style.borderColor = ACCENT, onBlur: ev => ev.target.style.borderColor = 'var(--border)' })),
+        e(Field, { label: 'FAMILIA DE LA FUENTE' }, e('input', { value: fontName, onChange: ev => setFontName(ev.target.value), style: inputStyle, onFocus: ev => ev.target.style.borderColor = ACCENT, onBlur: ev => ev.target.style.borderColor = 'var(--border)' }))
+      ),
+      e(Field, { label: 'AUTOR / DISEÑADOR' }, e('input', { value: author, placeholder: 'Nombre o seudónimo', onChange: ev => setAuthor(ev.target.value), style: inputStyle, onFocus: ev => ev.target.style.borderColor = ACCENT, onBlur: ev => ev.target.style.borderColor = 'var(--border)' })),
+      e(Field, { label: 'LICENCIA', hint: 'Opcional' }, e('input', { value: license, placeholder: 'MIT, OFL, Propietaria...', onChange: ev => setLicense(ev.target.value), style: inputStyle, onFocus: ev => ev.target.style.borderColor = ACCENT, onBlur: ev => ev.target.style.borderColor = 'var(--border)' })),
+
+      // Espaciado
+      e('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' } },
+        e(Field, { label: 'LETTER SPACING', hint: `${letterSpacing} px` },
           e('input', { type: 'range', min: -5, max: 20, value: letterSpacing, onChange: ev => setLetterSpacing(Number(ev.target.value)), style: sliderStyle })
-        )
-      ),
-      e(Field, { label: 'WORD SPACING' },
-        e('div', { style: { display: 'flex', flexDirection: 'column', gap: '6px' } },
-          e('div', { style: { display: 'flex', justifyContent: 'space-between' } }, e('span', { style: { fontFamily: FONT_MONO, fontSize: '9px', color: 'var(--muted2)' } }, 'Ancho del espacio'), e('span', { style: { fontFamily: FONT_MONO, fontSize: '12px', color: ACCENT } }, wordSpacing)),
-          e('input', { type: 'range', min: -30, max: 80, value: wordSpacing, onChange: ev => setWordSpacing(Number(ev.target.value)), style: sliderStyle })
-        )
-      ),
-      e('div', null,
-        e('button', { onClick: () => setShowAdvanced(v => !v), style: { display: 'flex', alignItems: 'center', gap: '8px', background: 'none', border: 'none', cursor: 'pointer', fontFamily: FONT_MONO, fontSize: '9px', letterSpacing: '2px', color: 'var(--muted)', padding: '4px 0' } },
-          e('span', { style: { transition: 'transform .2s', transform: showAdvanced ? 'rotate(90deg)' : 'none', display: 'inline-block' } }, '▶'), 'OPCIONES AVANZADAS'
         ),
-        showAdvanced && e('div', { style: { marginTop: '12px', padding: '16px', background: 'var(--surface2)', borderRadius: R_BTN, border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: '12px' } },
-          e('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' } },
-            [['UNITS PER EM', unitsPerEm, setUnitsPerEm, 500, 4000], ['ASCENDENTE', ascender, setAscender, -200, 2000], ['DESCENDENTE', descender, setDescender, -800, 200]].map(([lbl, val, setter, min, max]) =>
-              e('div', { key: lbl, style: { display: 'flex', flexDirection: 'column', gap: '5px' } },
-                e('label', { style: { fontFamily: FONT_MONO, fontSize: '8px', color: 'var(--muted)', letterSpacing: '1px' } }, lbl),
-                e('input', { type: 'number', value: val, min, max, onChange: ev => setter(Number(ev.target.value)), style: { ...inputStyle, fontSize: '12px', padding: '8px 10px' }, onFocus: ev => ev.target.style.borderColor = ACCENT, onBlur: ev => ev.target.style.borderColor = 'var(--border)' })
+        e(Field, { label: 'WORD SPACING', hint: `${wordSpacing}` },
+          e('input', { type: 'range', min: 1, max: 30, value: wordSpacing, onChange: ev => setWordSpacing(Number(ev.target.value)), style: sliderStyle })
+        )
+      ),
+
+      // Formato
+      e('div', { style: { display: 'flex', flexDirection: 'column', gap: '6px' } },
+        e('label', { style: { fontFamily: FONT_MONO, fontSize: '8px', letterSpacing: '2px', color: 'var(--muted)' } }, 'FORMATO'),
+        e('div', { style: { display: 'flex', gap: '8px' } },
+          [
+            { f: 'otf', desc: 'PostScript, máx. calidad' },
+            { f: 'ttf', desc: 'TrueType, compatible' },
+            { f: 'woff', desc: 'Web optimizado' }
+          ].map(({ f, desc }) =>
+            e('button', { key: f, onClick: () => setFormat(f), style: { flex: 1, padding: '10px 6px', borderRadius: R_BTN, cursor: 'pointer', fontFamily: FONT_MONO, fontWeight: '700', fontSize: '11px', letterSpacing: '1px', textTransform: 'uppercase', transition: 'all .13s', background: format === f ? ACCENT : 'var(--surface3)', color: format === f ? '#fff' : 'var(--muted)', border: format === f ? `1px solid ${ACCENT}` : '1px solid var(--border)', boxShadow: format === f ? `0 2px 8px ${ACCENT}40` : 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px' } },
+              e('span', null, f),
+              e('span', { style: { fontSize: '7px', fontWeight: '400', opacity: .7, letterSpacing: '0' } }, desc)
+            )
+          )
+        )
+      ),
+
+      // Opciones avanzadas
+      e('div', null,
+        e('button', { onClick: () => setShowAdvanced(v => !v), style: { display: 'flex', alignItems: 'center', gap: '7px', background: 'none', border: 'none', cursor: 'pointer', fontFamily: FONT_MONO, fontSize: '9px', letterSpacing: '2px', color: 'var(--muted)', padding: '4px 0' } },
+          e('span', { style: { transition: 'transform .2s', transform: showAdvanced ? 'rotate(90deg)' : 'none', display: 'inline-block', fontSize: '8px' } }, '▶'),
+          'PARÁMETROS AVANZADOS'
+        ),
+        showAdvanced && e('div', { style: { marginTop: '10px', padding: '14px', background: 'var(--surface2)', borderRadius: R_BTN, border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: '12px' } },
+          e('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '8px' } },
+            [
+              ['UNITS PER EM', unitsPerEm, setUnitsPerEm, 500, 4000],
+              ['ASCENDER',     ascender,   setAscender,  -200, 2000],
+              ['DESCENDER',    descender,  setDescender, -800,  200],
+              ['LINE GAP',     lineGap,    setLineGap,      0,  500]
+            ].map(([lbl, val, setter, min, max]) =>
+              e('div', { key: lbl, style: { display: 'flex', flexDirection: 'column', gap: '4px' } },
+                e('label', { style: { fontFamily: FONT_MONO, fontSize: '7px', color: 'var(--muted)', letterSpacing: '1px' } }, lbl),
+                e('input', { type: 'number', value: val, min, max, onChange: ev => setter(Number(ev.target.value)), style: { ...inputStyle, fontSize: '11px', padding: '6px 8px' }, onFocus: ev => ev.target.style.borderColor = ACCENT, onBlur: ev => ev.target.style.borderColor = 'var(--border)' })
               )
             )
           ),
-          e('p', { style: { fontFamily: FONT_MONO, fontSize: '9px', color: 'var(--muted2)', lineHeight: '1.6', margin: 0 } }, `Grid ${gridSize}×${gridSize}px · ${S} unidades/px · Baseline fila ${getBaselineRow(gridSize)}.`)
+          e('p', { style: { fontFamily: FONT_MONO, fontSize: '9px', color: 'var(--muted2)', lineHeight: '1.6', margin: 0 } },
+            `Baseline en fila ${baselineRow} → ascender ${defaultAscender} u, descender ${defaultDescender} u. Modificar sólo si sabes lo que haces.`)
         )
       ),
-      e('div', { style: { display: 'flex', flexDirection: 'column', gap: '8px' } },
-        e('label', { style: { fontFamily: FONT_MONO, fontSize: '8px', letterSpacing: '2px', color: 'var(--muted)' } }, 'FORMATO'),
-        e('div', { style: { display: 'flex', gap: '8px' } },
-          ['otf', 'ttf', 'woff'].map(f => e('button', { key: f, onClick: () => setFormat(f), style: { flex: 1, padding: '10px', borderRadius: R_BTN, cursor: 'pointer', fontFamily: FONT_MONO, fontWeight: '700', fontSize: '11px', letterSpacing: '1px', textTransform: 'uppercase', transition: 'all .13s', background: format === f ? ACCENT : 'var(--surface3)', color: format === f ? '#fff' : 'var(--muted)', border: format === f ? `1px solid ${ACCENT}` : '1px solid var(--border)', boxShadow: format === f ? `0 2px 8px ${ACCENT}40` : 'none' } }, f))
-        )
-      ),
+
+      // Botones acción
       e('div', { style: { display: 'flex', gap: '10px', paddingTop: '4px' } },
         e('button', { onClick: onClose, style: { flex: 1, padding: '12px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: R_BTN, color: 'var(--muted)', fontSize: '11px', fontFamily: FONT_MONO, cursor: 'pointer' } }, 'CANCELAR'),
-        e('button', { onClick: () => onExport(filename, format, { fontName, author, letterSpacing, wordSpacing, unitsPerEm, ascender, descender }), style: { flex: 2, padding: '12px', background: ACCENT, borderRadius: R_BTN, color: '#fff', fontWeight: '700', fontSize: '11px', fontFamily: FONT_MONO, border: 'none', cursor: 'pointer' } }, '⬇ EXPORTAR FUENTE')
+        e('button', { onClick: () => onExport(filename, format, { fontName, author, license, letterSpacing, wordSpacing, lineGap, unitsPerEm, ascender, descender }), style: { flex: 2, padding: '12px', background: ACCENT, borderRadius: R_BTN, color: '#fff', fontWeight: '700', fontSize: '11px', fontFamily: FONT_MONO, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' } },
+          e('svg', { width: '13', height: '13', viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: '2.5', strokeLinecap: 'round', strokeLinejoin: 'round' },
+            e('path', { d: 'M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4' }),
+            e('polyline', { points: '7 10 12 15 17 10' }),
+            e('line', { x1: '12', y1: '15', x2: '12', y2: '3' })
+          ),
+          `EXPORTAR .${format.toUpperCase()}`
+        )
       )
     )
   );
@@ -353,7 +402,7 @@ const PreferencesModal = ({ onClose, showSpaceMarker, setShowSpaceMarker, showCe
         e('aside', { style: { border: '1px solid var(--border)', borderRadius: R_BTN, background: 'var(--surface2)', padding: '8px', display: 'flex', flexDirection: 'column', gap: '4px' } },
           e('div', { style: { fontFamily: FONT_MONO, fontSize: '8px', color: 'var(--muted2)', letterSpacing: '2px', padding: '4px 6px 8px' } }, 'SECCIÓN'),
           e(MenuBtn, { id: 'guides', label: 'Guías' }),
-          e(MenuBtn, { id: 'view', label: 'Vista' }),
+          e(MenuBtn, { id: 'guardado', label: 'Guardado' }),
           e(MenuBtn, { id: 'shortcuts', label: 'Atajos' })
         ),
         e('section', { style: { border: '1px solid var(--border)', borderRadius: R_BTN, background: 'var(--surface)', padding: '16px', display: 'flex', flexDirection: 'column', gap: '14px', overflowY: 'auto' } },
@@ -370,31 +419,33 @@ const PreferencesModal = ({ onClose, showSpaceMarker, setShowSpaceMarker, showCe
             ),
             e(GuidePreview)
           ),
-          menu === 'view' && e(React.Fragment, null,
-            e('p', { style: { margin: 0, fontFamily: FONT_MONO, fontSize: '10px', color: 'var(--muted)', lineHeight: '1.6' } }, 'Ajustes visuales del editor.'),
-            e(ToggleCard, { title: 'Marcador del espacio', desc: 'Muestra una referencia visual en el carácter espacio para diferenciarlo de celdas vacías.', val: showSpaceMarker, setVal: setShowSpaceMarker }),
-            e('div', { style: { background: autosaveEnabled ? `${ACCENT}08` : 'var(--surface2)', border: autosaveEnabled ? `1px solid ${ACCENT}30` : '1px solid var(--border)', borderRadius: R_BTN, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: '10px', transition: 'all .15s' } },
+          menu === 'guardado' && e(React.Fragment, null,
+            e('div', { style: { fontFamily: FONT_MONO, fontSize: '9px', color: 'var(--muted)', lineHeight: '1.6', marginBottom: '4px' } }, 'Configura cuándo se guarda tu proyecto automáticamente. El guardado manual siempre está disponible con Ctrl+S.'),
+            e('div', { style: { background: autosaveEnabled ? `${ACCENT}08` : 'var(--surface2)', border: autosaveEnabled ? `1px solid ${ACCENT}30` : '1px solid var(--border)', borderRadius: R_BTN, padding: '14px', display: 'flex', flexDirection: 'column', gap: '12px', transition: 'all .15s' } },
               e('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' } },
                 e('div', null,
                   e('div', { style: { fontFamily: FONT_MONO, fontSize: '11px', color: 'var(--text)', marginBottom: '3px' } }, 'Guardado automático'),
-                  e('div', { style: { fontFamily: FONT_MONO, fontSize: '9px', color: 'var(--muted2)', lineHeight: 1.5 } }, 'Guarda el proyecto cada N minutos.')
+                  e('div', { style: { fontFamily: FONT_MONO, fontSize: '9px', color: 'var(--muted2)', lineHeight: 1.5 } }, 'Guarda en Firebase cada N minutos.')
                 ),
-                e('button', { onClick: () => setAutosaveEnabled(v => !v), style: { flexShrink: 0, padding: '2px 8px', borderRadius: '4px', border: autosaveEnabled ? `1px solid ${ACCENT}40` : '1px solid var(--border)', background: autosaveEnabled ? `${ACCENT}15` : 'var(--surface3)', color: autosaveEnabled ? ACCENT : 'var(--muted2)', fontFamily: FONT_MONO, fontSize: '8px', letterSpacing: '1px', cursor: 'pointer', transition: 'all .13s' } }, autosaveEnabled ? 'ON' : 'OFF')
+                e('button', { onClick: () => setAutosaveEnabled(v => !v), style: { flexShrink: 0, padding: '3px 10px', borderRadius: '4px', border: autosaveEnabled ? `1px solid ${ACCENT}40` : '1px solid var(--border)', background: autosaveEnabled ? ACCENT : 'var(--surface3)', color: autosaveEnabled ? '#fff' : 'var(--muted2)', fontFamily: FONT_MONO, fontSize: '8px', letterSpacing: '1px', cursor: 'pointer', transition: 'all .13s' } }, autosaveEnabled ? 'ON' : 'OFF')
               ),
-              autosaveEnabled && e('div', { style: { display: 'flex', flexDirection: 'column', gap: '6px' } },
+              autosaveEnabled && e('div', { style: { display: 'flex', flexDirection: 'column', gap: '8px' } },
                 e('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' } },
                   e('span', { style: { fontFamily: FONT_MONO, fontSize: '10px', color: 'var(--muted)' } }, 'Intervalo'),
-                  e('span', { style: { fontFamily: FONT_MONO, fontSize: '11px', color: ACCENT } }, `${autosaveMinutes} min`)
+                  e('span', { style: { fontFamily: FONT_MONO, fontSize: '12px', color: ACCENT, fontWeight: '700' } }, `${autosaveMinutes} min`)
                 ),
                 e('input', { type: 'range', min: 1, max: 30, value: autosaveMinutes, onChange: ev => setAutosaveMinutes(Number(ev.target.value)), style: { width: '100%', accentColor: ACCENT, cursor: 'pointer' } }),
                 e('div', { style: { display: 'flex', gap: '4px' } },
                   [1, 2, 5, 10, 15, 30].map(n =>
-                    e('button', { key: n, onClick: () => setAutosaveMinutes(n), style: { flex: 1, padding: '4px', borderRadius: '4px', border: autosaveMinutes === n ? `1px solid ${ACCENT}` : '1px solid var(--border)', background: autosaveMinutes === n ? ACCENT : 'var(--surface3)', color: autosaveMinutes === n ? '#fff' : 'var(--muted)', fontFamily: FONT_MONO, fontSize: '8px', cursor: 'pointer', transition: 'all .12s' } }, n)
+                    e('button', { key: n, onClick: () => setAutosaveMinutes(n), style: { flex: 1, padding: '5px 0', borderRadius: '4px', border: autosaveMinutes === n ? `1px solid ${ACCENT}` : '1px solid var(--border)', background: autosaveMinutes === n ? ACCENT : 'var(--surface3)', color: autosaveMinutes === n ? '#fff' : 'var(--muted)', fontFamily: FONT_MONO, fontSize: '9px', cursor: 'pointer', transition: 'all .12s' } }, n)
                   )
                 )
               )
             ),
-            e(GuidePreview)
+            e('div', { style: { background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: R_BTN, padding: '12px 14px' } },
+              e('div', { style: { fontFamily: FONT_MONO, fontSize: '10px', color: 'var(--text)', marginBottom: '4px' } }, 'Guardado manual'),
+              e('div', { style: { fontFamily: FONT_MONO, fontSize: '9px', color: 'var(--muted2)', lineHeight: 1.5 } }, 'Usa Ctrl+S en cualquier momento para guardar el proyecto en Firebase inmediatamente. El guardado sólo ocurre al usar este atajo o al activar el guardado automático — no se guarda al dibujar.')
+            )
           ),
           menu === 'shortcuts' && e(React.Fragment, null,
             e('p', { style: { margin: 0, fontFamily: FONT_MONO, fontSize: '10px', color: 'var(--muted)', lineHeight: '1.6' } }, 'Atajos de teclado disponibles en el editor.'),
@@ -676,13 +727,6 @@ export function EditorPage({
           )
         ),
 
-        // Espacio marcador
-        e(Tooltip, { label: showSpaceMarker ? 'Ocultar marcador' : 'Marcador de espacio', placement: 'bottom' },
-          e('button', { onClick: () => setShowSpaceMarker(v => !v), style: { height: '32px', padding: '0 10px', borderRadius: R_BTN, background: showSpaceMarker ? ACCENT : 'var(--surface2)', border: showSpaceMarker ? 'none' : '1px solid var(--border)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontFamily: FONT_MONO, fontSize: '8px', letterSpacing: '1px', color: showSpaceMarker ? '#fff' : 'var(--muted)', transition: 'all .15s' } },
-            e('span', { style: { fontSize: '12px', lineHeight: 1 } }, '␠'), 'ESPACIO'
-          )
-        ),
-
         // Tema
         e(Tooltip, { label: isDark ? 'Modo claro' : 'Modo oscuro', placement: 'bottom' },
           e('button', { onClick: toggleTheme, style: { width: '32px', height: '32px', borderRadius: '50%', background: 'var(--surface2)', border: '1px solid var(--border)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background .15s' } },
@@ -756,7 +800,7 @@ export function EditorPage({
         e('div', { style: { display: 'flex', gap: '1px', alignItems: 'center', flexWrap: 'wrap', padding: '6px', background: 'var(--surface2)', borderRadius: R_CARD, border: '1px solid var(--border)', width: '100%' } },
           ...modeTools.map(t =>
             e(Tooltip, { key: t.id, label: t.tooltip, placement: 'bottom' },
-              e('button', { onClick: () => setTool(t.id), style: { ...toolbarBase, background: tool === t.id ? ACCENT : 'var(--surface2)', color: tool === t.id ? '#fff' : 'var(--muted)', boxShadow: tool === t.id ? `0 2px 8px ${ACCENT}40` : 'none', borderColor: tool === t.id ? ACCENT : 'var(--border)' } },
+              e('button', { onClick: () => setTool(t.id), style: { ...toolbarBase, background: tool === t.id ? ACCENT : 'var(--surface)', color: tool === t.id ? '#fff' : 'var(--muted)', boxShadow: tool === t.id ? `0 2px 8px ${ACCENT}40` : 'none', borderColor: tool === t.id ? ACCENT : 'var(--border)' } },
                 e('img', { src: `./src/icons/${t.iconName}.svg`, style: { width: '16px', height: '16px', filter: tool === t.id ? 'invert(1)' : 'var(--icon-filter)', opacity: tool === t.id ? 1 : .65 } })
               )
             )
@@ -932,11 +976,12 @@ export function EditorPage({
     // ── MODALES ────────────────────────────────
     showExport && e(ExportModal, {
       projectName, fontData, gridSize, previewText,
+      userBaselineRow: baselineGuideRow,
       onClose: () => setShowExport(false),
       onExport: (filename, format, meta) => {
         try {
           const safe = (filename || projectName || 'mi-fuente').trim() || 'mi-fuente';
-          buildAndDownload(fontData, gridSize, safe, format, meta);
+          buildAndDownload(fontData, gridSize, safe, format, { ...meta, baselineRow: baselineGuideRow });
           setShowExport(false);
         } catch (err) { alert(err?.message || 'No se pudo exportar.'); }
       }
