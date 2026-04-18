@@ -1,5 +1,16 @@
 // ─────────────────────────────────────────────
 //  EDITOR — src/Editor.js  (v2.4)
+//  Cambios v2.3 (mejoras de rendimiento y correcciones):
+//  • TOOLTIP_POS movido fuera de Tooltip — ya no se recrea en cada render
+//  • EXTENDED_CHARS movido fuera de EditorPage — ya no se recrea en cada render
+//  • SHORTCUTS movido fuera de PreferencesModal — ya no se recrea en cada render
+//  • DragSlider: usa computeRef para evitar re-registrar listeners globales en cada cambio de prop
+//  • useCallback aplicado a parseCharCode, addToList, removeFromList, addAllChars, onCopyGlyph, onPaste
+//  • useEffect del teclado: deps faltantes grid, clipboard, onPasteGlyph añadidas (evitaba stale closures)
+//  • 5 efectos de persistencia de guías consolidados en uno solo
+//  • 2 efectos de autosave consolidados en uno solo
+//  • canvasSize eliminado (era alias innecesario de CANVAS_BASE)
+//  Cambios v2.4 (reorganización de barra de herramientas):
 //  • Toolbar rediseñada con 5 grupos: Edición, Historial, Transformación, Movimiento, Gestión
 //  • Todos los iconos migrados a SVG inline — mismo set, mismo stroke, sin dependencia de archivos externos
 //  • Undo/Redo usan flechas curvas (ya no flechas rectas que confundían con movimiento)
@@ -735,6 +746,9 @@ export function EditorPage({
     setShowAddChar(false);
     if (toAdd[0]) onSwitchChar(toAdd[0]);
   }, [addCharList, extraChars, onSwitchChar, onSaveExtraChars]);
+
+  const onCopyGlyph = useCallback(() => setClipboard([...grid]), [grid]);
+  const onPaste     = useCallback(() => { if (clipboard) onPasteGlyph?.(clipboard); }, [clipboard, onPasteGlyph]);
 
   // ── Inline SVG icons — mismo set, mismo stroke, sin depender de archivos .svg externos
   const IC = {
