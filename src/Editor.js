@@ -164,45 +164,80 @@ const GuideOverlay = ({ gridSize, capGuideRow, xHeightGuideRow, baselineGuideRow
 };
 
 // ─────────────────────────────────────────────
+//  DRAG SLIDER — funciona con click y arrastre
+// ─────────────────────────────────────────────
+const DragSlider = ({ value, onChange, min, max, step = 1 }) => {
+  const trackRef = useRef(null);
+  const dragging = useRef(false);
+
+  const compute = (clientX) => {
+    const rect = trackRef.current.getBoundingClientRect();
+    const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+    const raw = min + ratio * (max - min);
+    onChange(Math.round(raw / step) * step);
+  };
+
+  useEffect(() => {
+    const onMove = (ev) => { if (!dragging.current) return; compute(ev.touches ? ev.touches[0].clientX : ev.clientX); };
+    const onUp   = () => { dragging.current = false; };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup',   onUp);
+    window.addEventListener('touchmove', onMove, { passive: false });
+    window.addEventListener('touchend',  onUp);
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup',   onUp);
+      window.removeEventListener('touchmove', onMove);
+      window.removeEventListener('touchend',  onUp);
+    };
+  }, [min, max, step, onChange]);
+
+  const pct = ((value - min) / (max - min)) * 100;
+  return e('div', {
+    ref: trackRef,
+    style: { position: 'relative', height: '22px', display: 'flex', alignItems: 'center', cursor: 'pointer', userSelect: 'none', padding: '0 7px', boxSizing: 'border-box' },
+    onMouseDown: (ev) => { ev.preventDefault(); dragging.current = true; compute(ev.clientX); },
+    onTouchStart: (ev) => { ev.preventDefault(); compute(ev.touches[0].clientX); dragging.current = true; },
+  },
+    e('div', { style: { position: 'absolute', left: '7px', right: '7px', height: '3px', borderRadius: '2px', background: 'var(--border)' } }),
+    e('div', { style: { position: 'absolute', left: '7px', width: `calc(${pct}% - 0px)`, height: '3px', borderRadius: '2px', background: ACCENT, maxWidth: 'calc(100% - 14px)' } }),
+    e('div', { style: { position: 'absolute', left: `calc(${pct}% - 0px)`, transform: 'translateX(-50%)', width: '14px', height: '14px', borderRadius: '50%', background: ACCENT, border: '2px solid var(--surface)', boxShadow: `0 0 0 2px ${ACCENT}60`, cursor: 'grab', flexShrink: 0, zIndex: 1 } })
+  );
+};
+
+// ─────────────────────────────────────────────
 //  EXPORT MODAL
 // ─────────────────────────────────────────────
 const ExportModal = ({ projectName, fontData, gridSize, previewText: extText, onClose, onExport, userBaselineRow }) => {
-  const [filename,      setFilename]      = useState(projectName || 'mi-fuente');
   const [fontName,      setFontName]      = useState(projectName || 'mi-fuente');
+  const [version,       setVersion]       = useState('1.000');
   const [author,        setAuthor]        = useState('');
   const [format,        setFormat]        = useState('otf');
-  const [letterSpacing, setLetterSpacing] = useState(0);
-  const [wordSpacing,   setWordSpacing]   = useState(6);
+  const [letterSpacing, setLetterSpacing] = useState(1);
+  const [wordSpacing,   setWordSpacing]   = useState(8);
   const [showAdvanced,  setShowAdvanced]  = useState(false);
   const [unitsPerEm,    setUnitsPerEm]    = useState(1000);
   const [lineGap,       setLineGap]       = useState(0);
   const [license,       setLicense]       = useState('');
 
-  // Usa la baseline configurada por el usuario (o el default del grid)
   const baselineRow = userBaselineRow != null ? userBaselineRow : getBaselineRow(gridSize);
-
-  // S = unitsPerEm / gridSize → 1 píxel = S unidades
   const S = Math.round(unitsPerEm / gridSize);
-  // ascender: filas desde arriba hasta baseline × S
   const defaultAscender  =  Math.round(baselineRow * S);
-  // descender: filas debajo de baseline (negativo)
   const defaultDescender = -Math.round((gridSize - baselineRow) * S);
-
   const [ascender,  setAscender]  = useState(defaultAscender);
   const [descender, setDescender] = useState(defaultDescender);
 
   const inputStyle = { background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: R_BTN, padding: '9px 12px', color: 'var(--text)', fontSize: '12px', outline: 'none', fontFamily: FONT_MONO, width: '100%', transition: 'border-color .15s', boxSizing: 'border-box' };
-  const sliderStyle = { width: '100%', accentColor: ACCENT, cursor: 'pointer' };
-  const Field = ({ label, hint, children }) => e('div', { style: { display: 'flex', flexDirection: 'column', gap: '5px' } },
+  const Field = ({ label, hint, children }) => e('div', { style: { display: 'flex', flexDirection: 'column', gap: '6px' } },
     e('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' } },
       e('label', { style: { fontFamily: FONT_MONO, fontSize: '8px', letterSpacing: '2px', color: 'var(--muted)' } }, label),
-      hint && e('span', { style: { fontFamily: FONT_MONO, fontSize: '8px', color: 'var(--muted2)' } }, hint)
+      hint != null && e('span', { style: { fontFamily: FONT_MONO, fontSize: '9px', color: ACCENT, fontWeight: '700' } }, hint)
     ),
     children
   );
 
   return e(Overlay, { onClose },
-    e('div', { style: { background: 'var(--surface)', border: '1px solid var(--border2)', borderRadius: R_CARD, padding: '26px', width: '560px', maxHeight: '92vh', overflowY: 'auto', boxShadow: '0 32px 80px rgba(0,0,0,0.4)', display: 'flex', flexDirection: 'column', gap: '16px' } },
+    e('div', { style: { background: 'var(--surface)', border: '1px solid var(--border2)', borderRadius: R_CARD, padding: '26px', width: '540px', maxHeight: '92vh', overflowY: 'auto', boxShadow: '0 32px 80px rgba(0,0,0,0.4)', display: 'flex', flexDirection: 'column', gap: '16px' } },
 
       // Header
       e('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' } },
@@ -219,21 +254,25 @@ const ExportModal = ({ projectName, fontData, gridSize, previewText: extText, on
         e(PixelPreview, { text: extText || 'Abc 123', fontData, gridSize, pixelSize: 4, color: ACCENT, letterSpacing, wordSpacing, baselineRow })
       ),
 
-      // Nombres
-      e('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' } },
-        e(Field, { label: 'NOMBRE DEL ARCHIVO' }, e('input', { value: filename, onChange: ev => setFilename(ev.target.value), style: inputStyle, onFocus: ev => ev.target.style.borderColor = ACCENT, onBlur: ev => ev.target.style.borderColor = 'var(--border)' })),
-        e(Field, { label: 'FAMILIA DE LA FUENTE' }, e('input', { value: fontName, onChange: ev => setFontName(ev.target.value), style: inputStyle, onFocus: ev => ev.target.style.borderColor = ACCENT, onBlur: ev => ev.target.style.borderColor = 'var(--border)' }))
+      // Nombre de la fuente + versión
+      e('div', { style: { display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '10px' } },
+        e(Field, { label: 'NOMBRE DE LA FUENTE' }, e('input', { value: fontName, onChange: ev => setFontName(ev.target.value), style: inputStyle, onFocus: ev => ev.target.style.borderColor = ACCENT, onBlur: ev => ev.target.style.borderColor = 'var(--border)' })),
+        e(Field, { label: 'VERSIÓN' }, e('input', { value: version, onChange: ev => setVersion(ev.target.value), placeholder: '1.000', style: inputStyle, onFocus: ev => ev.target.style.borderColor = ACCENT, onBlur: ev => ev.target.style.borderColor = 'var(--border)' }))
       ),
-      e(Field, { label: 'AUTOR / DISEÑADOR' }, e('input', { value: author, placeholder: 'Nombre o seudónimo', onChange: ev => setAuthor(ev.target.value), style: inputStyle, onFocus: ev => ev.target.style.borderColor = ACCENT, onBlur: ev => ev.target.style.borderColor = 'var(--border)' })),
-      e(Field, { label: 'LICENCIA', hint: 'Opcional' }, e('input', { value: license, placeholder: 'MIT, OFL, Propietaria...', onChange: ev => setLicense(ev.target.value), style: inputStyle, onFocus: ev => ev.target.style.borderColor = ACCENT, onBlur: ev => ev.target.style.borderColor = 'var(--border)' })),
 
-      // Espaciado
-      e('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' } },
+      // Autor + licencia
+      e('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' } },
+        e(Field, { label: 'AUTOR / DISEÑADOR' }, e('input', { value: author, placeholder: 'Nombre o seudónimo', onChange: ev => setAuthor(ev.target.value), style: inputStyle, onFocus: ev => ev.target.style.borderColor = ACCENT, onBlur: ev => ev.target.style.borderColor = 'var(--border)' })),
+        e(Field, { label: 'LICENCIA' }, e('input', { value: license, placeholder: 'MIT, OFL, Prop...', onChange: ev => setLicense(ev.target.value), style: inputStyle, onFocus: ev => ev.target.style.borderColor = ACCENT, onBlur: ev => ev.target.style.borderColor = 'var(--border)' }))
+      ),
+
+      // Espaciado con sliders custom drag
+      e('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' } },
         e(Field, { label: 'LETTER SPACING', hint: `${letterSpacing} px` },
-          e('input', { type: 'range', min: -5, max: 20, value: letterSpacing, onChange: ev => setLetterSpacing(Number(ev.target.value)), style: sliderStyle })
+          e(DragSlider, { value: letterSpacing, onChange: setLetterSpacing, min: 0, max: 20 })
         ),
-        e(Field, { label: 'WORD SPACING', hint: `${wordSpacing}` },
-          e('input', { type: 'range', min: 1, max: 30, value: wordSpacing, onChange: ev => setWordSpacing(Number(ev.target.value)), style: sliderStyle })
+        e(Field, { label: 'WORD SPACING', hint: `${wordSpacing} px` },
+          e(DragSlider, { value: wordSpacing, onChange: setWordSpacing, min: 1, max: 30 })
         )
       ),
 
@@ -242,9 +281,9 @@ const ExportModal = ({ projectName, fontData, gridSize, previewText: extText, on
         e('label', { style: { fontFamily: FONT_MONO, fontSize: '8px', letterSpacing: '2px', color: 'var(--muted)' } }, 'FORMATO'),
         e('div', { style: { display: 'flex', gap: '8px' } },
           [
-            { f: 'otf', desc: 'PostScript, máx. calidad' },
-            { f: 'ttf', desc: 'TrueType, compatible' },
-            { f: 'woff', desc: 'Web optimizado' }
+            { f: 'otf', desc: 'PostScript · máx. calidad' },
+            { f: 'ttf', desc: 'TrueType · compatible' },
+            { f: 'woff', desc: 'Web · optimizado' }
           ].map(({ f, desc }) =>
             e('button', { key: f, onClick: () => setFormat(f), style: { flex: 1, padding: '10px 6px', borderRadius: R_BTN, cursor: 'pointer', fontFamily: FONT_MONO, fontWeight: '700', fontSize: '11px', letterSpacing: '1px', textTransform: 'uppercase', transition: 'all .13s', background: format === f ? ACCENT : 'var(--surface3)', color: format === f ? '#fff' : 'var(--muted)', border: format === f ? `1px solid ${ACCENT}` : '1px solid var(--border)', boxShadow: format === f ? `0 2px 8px ${ACCENT}40` : 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px' } },
               e('span', null, f),
@@ -254,7 +293,7 @@ const ExportModal = ({ projectName, fontData, gridSize, previewText: extText, on
         )
       ),
 
-      // Opciones avanzadas
+      // Avanzados
       e('div', null,
         e('button', { onClick: () => setShowAdvanced(v => !v), style: { display: 'flex', alignItems: 'center', gap: '7px', background: 'none', border: 'none', cursor: 'pointer', fontFamily: FONT_MONO, fontSize: '9px', letterSpacing: '2px', color: 'var(--muted)', padding: '4px 0' } },
           e('span', { style: { transition: 'transform .2s', transform: showAdvanced ? 'rotate(90deg)' : 'none', display: 'inline-block', fontSize: '8px' } }, '▶'),
@@ -275,14 +314,14 @@ const ExportModal = ({ projectName, fontData, gridSize, previewText: extText, on
             )
           ),
           e('p', { style: { fontFamily: FONT_MONO, fontSize: '9px', color: 'var(--muted2)', lineHeight: '1.6', margin: 0 } },
-            `Baseline en fila ${baselineRow} → ascender ${defaultAscender} u, descender ${defaultDescender} u. Modificar sólo si sabes lo que haces.`)
+            `Baseline fila ${baselineRow} → ascender ${defaultAscender} u · descender ${defaultDescender} u`)
         )
       ),
 
-      // Botones acción
+      // Botones
       e('div', { style: { display: 'flex', gap: '10px', paddingTop: '4px' } },
         e('button', { onClick: onClose, style: { flex: 1, padding: '12px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: R_BTN, color: 'var(--muted)', fontSize: '11px', fontFamily: FONT_MONO, cursor: 'pointer' } }, 'CANCELAR'),
-        e('button', { onClick: () => onExport(filename, format, { fontName, author, license, letterSpacing, wordSpacing, lineGap, unitsPerEm, ascender, descender }), style: { flex: 2, padding: '12px', background: ACCENT, borderRadius: R_BTN, color: '#fff', fontWeight: '700', fontSize: '11px', fontFamily: FONT_MONO, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' } },
+        e('button', { onClick: () => onExport(fontName, format, { fontName, version, author, license, letterSpacing, wordSpacing, lineGap, unitsPerEm, ascender, descender }), style: { flex: 2, padding: '12px', background: ACCENT, borderRadius: R_BTN, color: '#fff', fontWeight: '700', fontSize: '11px', fontFamily: FONT_MONO, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' } },
           e('svg', { width: '13', height: '13', viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: '2.5', strokeLinecap: 'round', strokeLinejoin: 'round' },
             e('path', { d: 'M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4' }),
             e('polyline', { points: '7 10 12 15 17 10' }),
@@ -361,7 +400,9 @@ const PreferencesModal = ({ onClose, showSpaceMarker, setShowSpaceMarker, showCe
         e('span', { style: { fontFamily: FONT_MONO, fontSize: '10px', color: showVal ? ACCENT : 'var(--muted2)', minWidth: '16px', textAlign: 'right' } }, value),
         e(MiniToggle, { val: showVal, setVal: setShowVal })
       ),
-      e('input', { type: 'range', min, max, value, onChange, style: { width: '100%', accentColor: ACCENT, cursor: 'pointer', opacity: showVal ? 1 : 0.35, transition: 'opacity .15s' } })
+      e('div', { style: { opacity: showVal ? 1 : 0.35, transition: 'opacity .15s' } },
+        e(DragSlider, { value, onChange: v => onChange({ target: { value: v } }), min, max })
+      )
     );
 
   const previewSize = 16;
@@ -388,6 +429,7 @@ const PreferencesModal = ({ onClose, showSpaceMarker, setShowSpaceMarker, showCe
   const SHORTCUTS = [
     ['P', 'Herramienta Lápiz'], ['F', 'Herramienta Relleno'], ['H', 'Espejo horizontal'], ['V', 'Espejo vertical'],
     ['Ctrl+S', 'Guardar proyecto'], ['Ctrl+Z', 'Deshacer'], ['Ctrl+Y / Ctrl+Shift+Z', 'Rehacer'], ['Ctrl+I', 'Invertir glifo'],
+    ['Ctrl+C', 'Copiar glifo'], ['Ctrl+V', 'Pegar glifo'],
     ['← → ↑ ↓', 'Desplazar glifo'],
     ['Delete', 'Limpiar glifo'], ['Escape', 'Cerrar modal'],
   ];
@@ -434,7 +476,7 @@ const PreferencesModal = ({ onClose, showSpaceMarker, setShowSpaceMarker, showCe
                   e('span', { style: { fontFamily: FONT_MONO, fontSize: '10px', color: 'var(--muted)' } }, 'Intervalo'),
                   e('span', { style: { fontFamily: FONT_MONO, fontSize: '12px', color: ACCENT, fontWeight: '700' } }, `${autosaveMinutes} min`)
                 ),
-                e('input', { type: 'range', min: 1, max: 30, value: autosaveMinutes, onChange: ev => setAutosaveMinutes(Number(ev.target.value)), style: { width: '100%', accentColor: ACCENT, cursor: 'pointer' } }),
+                e(DragSlider, { value: autosaveMinutes, onChange: setAutosaveMinutes, min: 1, max: 30 }),
                 e('div', { style: { display: 'flex', gap: '4px' } },
                   [1, 2, 5, 10, 15, 30].map(n =>
                     e('button', { key: n, onClick: () => setAutosaveMinutes(n), style: { flex: 1, padding: '5px 0', borderRadius: '4px', border: autosaveMinutes === n ? `1px solid ${ACCENT}` : '1px solid var(--border)', background: autosaveMinutes === n ? ACCENT : 'var(--surface3)', color: autosaveMinutes === n ? '#fff' : 'var(--muted)', fontFamily: FONT_MONO, fontSize: '9px', cursor: 'pointer', transition: 'all .12s' } }, n)
@@ -473,7 +515,7 @@ export function EditorPage({
   tool, setTool, previewText, setPreviewText, onPixelDown, onPixelEnter, onMouseUp,
   onSwitchChar, onClearCanvas, onInvert, onShift, onSave, onUndo, onRedo,
   onBack, onPublish, projectName, isPublishing, publishedOk, onResetPublish,
-  onSaveExtraChars, initialExtraChars
+  onSaveExtraChars, initialExtraChars, onPasteGlyph
 }) {
   const [showExport,      setShowExport]      = useState(false);
   const [showPublish,     setShowPublish]     = useState(false);
@@ -484,6 +526,7 @@ export function EditorPage({
   const [charFilter,      setCharFilter]      = useState('all');
   const [charSearch,      setCharSearch]      = useState('');
   const [charPage,        setCharPage]        = useState(0);
+  const [clipboard,       setClipboard]       = useState(null); // glyph array
   const [autosaveEnabled, setAutosaveEnabled] = useState(() => localStorage.getItem('cs-autosave-enabled') === '1');
   const [autosaveMinutes, setAutosaveMinutes] = useState(() => Number(localStorage.getItem('cs-autosave-minutes') || 5));
   const [showAddChar,     setShowAddChar]     = useState(false);
@@ -572,6 +615,8 @@ export function EditorPage({
       if (ctrl && ev.key === 'z' && !ev.shiftKey) { ev.preventDefault(); onUndo(); return; }
       if (ctrl && (ev.key === 'y' || (ev.key === 'z' && ev.shiftKey))) { ev.preventDefault(); onRedo(); return; }
       if (ctrl && ev.key === 'i') { ev.preventDefault(); onInvert(); return; }
+      if (ctrl && ev.key === 'c') { ev.preventDefault(); setClipboard([...grid]); return; }
+      if (ctrl && ev.key === 'v') { ev.preventDefault(); if (clipboard) { onPasteGlyph?.(clipboard); } return; }
       if (!ctrl) {
         if (ev.key === 'p') { setTool('pencil'); return; }
         if (ev.key === 'f') { setTool('fill'); return; }
@@ -603,8 +648,19 @@ export function EditorPage({
     return () => clearInterval(id);
   }, [autosaveEnabled, autosaveMinutes, onSave]);
 
-  // All chars for panel = TECLADO + extraChars (must be before filteredChars)
-  const allChars = useMemo(() => [...TECLADO, ...extraChars.filter(c => !TECLADO.includes(c))], [extraChars]);
+  // Chars base = TECLADO + vocales con tildes + especiales comunes + extras del usuario
+  const EXTENDED_CHARS = [
+    'á','é','í','ó','ú','Á','É','Í','Ó','Ú','ü','Ü','ñ','Ñ',
+    '¡','¿','@','#','$','%','&','*','(',')','-','+','=','[',']','{','}',
+    '<','>','/','\\','|','_','~','^','`','\'','"',':',';',',','.','!'
+  ];
+  // All chars for panel = TECLADO + extended + extraChars
+  const allChars = useMemo(() => {
+    const base = [...TECLADO];
+    EXTENDED_CHARS.forEach(c => { if (!base.includes(c)) base.push(c); });
+    extraChars.forEach(c => { if (!base.includes(c)) base.push(c); });
+    return base;
+  }, [extraChars]);
 
   // Filtrado de caracteres
   const filteredChars = useMemo(() => {
@@ -676,6 +732,8 @@ export function EditorPage({
     { iconName: 'mirror-h',    tooltip: 'Izquierda (←)', fn: () => onShift('left') },
     { iconName: 'mirror-v',    tooltip: 'Derecha (→)', fn: () => onShift('right') },
   ];
+  const onCopyGlyph = () => setClipboard([...grid]);
+  const onPaste     = () => { if (clipboard) onPasteGlyph?.(clipboard); };
   const toolbarBase = { padding: '7px', borderRadius: R_BTN, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '3px', minWidth: '34px', fontFamily: FONT_MONO, border: '1px solid var(--border)', transition: 'all .13s' };
 
   // ─────────────────────────────────────────────
@@ -817,6 +875,23 @@ export function EditorPage({
           e(Tooltip, { label: 'Limpiar glifo (Delete)', placement: 'bottom' },
             e('button', { onClick: onClearCanvas, style: { ...toolbarBase, background: 'rgba(191,69,69,0.07)', border: '1px solid rgba(191,69,69,0.2)', color: ACCENT }, onMouseEnter: ev => { ev.currentTarget.style.background = 'rgba(191,69,69,0.14)'; }, onMouseLeave: ev => { ev.currentTarget.style.background = 'rgba(191,69,69,0.07)'; } },
               e('img', { src: './src/icons/delete.svg', style: { width: '16px', height: '16px', opacity: .7 } })
+            )
+          ),
+          e('div', { style: { width: '1px', height: '40px', background: 'var(--border)', margin: '0 3px' } }),
+          e(Tooltip, { label: 'Copiar glifo (Ctrl+C)', placement: 'bottom' },
+            e('button', { onClick: onCopyGlyph, style: { ...toolbarBase, background: 'var(--surface)' } },
+              e('svg', { width: '15', height: '15', viewBox: '0 0 24 24', fill: 'none', stroke: 'var(--muted)', strokeWidth: '2', strokeLinecap: 'round', strokeLinejoin: 'round' },
+                e('rect', { x: '9', y: '9', width: '13', height: '13', rx: '2', ry: '2' }),
+                e('path', { d: 'M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1' })
+              )
+            )
+          ),
+          e(Tooltip, { label: clipboard ? 'Pegar glifo (Ctrl+V)' : 'Portapapeles vacío', placement: 'bottom' },
+            e('button', { onClick: onPaste, style: { ...toolbarBase, background: 'var(--surface)', opacity: clipboard ? 1 : .4, cursor: clipboard ? 'pointer' : 'not-allowed' } },
+              e('svg', { width: '15', height: '15', viewBox: '0 0 24 24', fill: 'none', stroke: 'var(--muted)', strokeWidth: '2', strokeLinecap: 'round', strokeLinejoin: 'round' },
+                e('path', { d: 'M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2' }),
+                e('rect', { x: '8', y: '2', width: '8', height: '4', rx: '1', ry: '1' })
+              )
             )
           )
         ),
@@ -980,7 +1055,7 @@ export function EditorPage({
       onClose: () => setShowExport(false),
       onExport: (filename, format, meta) => {
         try {
-          const safe = (filename || projectName || 'mi-fuente').trim() || 'mi-fuente';
+          const safe = (filename || projectName || 'mi-fuente').replace(/[^a-zA-Z0-9_\-\.]/g, '-').trim() || 'mi-fuente';
           buildAndDownload(fontData, gridSize, safe, format, { ...meta, baselineRow: baselineGuideRow });
           setShowExport(false);
         } catch (err) { alert(err?.message || 'No se pudo exportar.'); }
