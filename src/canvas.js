@@ -75,7 +75,7 @@ export function buildAndDownload(fontData, gridSize, filename, format, meta = {}
 
   // Escala: cada píxel del canvas → S unidades opentype
   // S = 1.0 → el gridSize llena exactamente el em completo
-  const S = Math.round((unitsPerEm * 1.0) / gridSize);
+  const S = Math.round((unitsPerEm * 2) / gridSize);
   const pxSpacing = Math.round(letterSpacing * S);
 
   // Fila de baseline (0-indexed desde arriba del grid)
