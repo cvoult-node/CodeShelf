@@ -141,7 +141,7 @@ const ExportModal = ({ projectName, fontData, gridSize, previewText: extText, on
   const [ascender, setAscender] = useState(800);
   const [descender, setDescender] = useState(-250);
 
-  const inputStyle = { background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: R_BTN, padding: '10px 13px', color: 'var(--text)', fontSize: '13px', outline: 'none', fontFamily: FONT_MONO, width: '100%', transition: 'border-color .15s' };
+  const inputStyle = { background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: R_BTN, padding: '10px 13px', color: 'var(--text)', fontSize: '13px', outline: 'none', fontFamily: FONT_MONO, width: '100%', transition: 'border-color .15s' };
   const sliderStyle = { width: '100%', accentColor: ACCENT, cursor: 'pointer' };
   const Field = ({ label, children }) => e('div', { style: { display: 'flex', flexDirection: 'column', gap: '6px' } }, e('label', { style: { fontFamily: FONT_MONO, fontSize: '8px', letterSpacing: '2px', color: 'var(--muted)' } }, label), children);
 
