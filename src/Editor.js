@@ -134,7 +134,7 @@ const ExportModal = ({ projectName, fontData, gridSize, previewText: extText, on
   const [unitsPerEm, setUnitsPerEm] = useState(1000);
 
   // S dinámico = mismo cálculo que canvas.js — glifos llenan ~80% del em
-  const S = Math.round((unitsPerEm * 0.1) / gridSize);
+  const S = Math.round((unitsPerEm * 1) / gridSize);
   const baselineRow = getBaselineRow(gridSize);
   // ascender: desde baseline hasta arriba del grid, en unidades opentype
   const defaultAscender = Math.round(baselineRow * S);
@@ -156,7 +156,7 @@ const ExportModal = ({ projectName, fontData, gridSize, previewText: extText, on
       ),
       e('div', { style: { background: 'var(--surface2)', border: '1px solid var(--border2)', borderRadius: R_BTN, padding: '14px', minHeight: '100px' } },
         e('div', { style: { fontFamily: FONT_MONO, fontSize: '8px', color: 'var(--muted2)', letterSpacing: '2px', marginBottom: '10px' } }, 'PREVIEW'),
-        e(PixelPreview, { text: extText || 'Lorem ipsum', fontData, gridSize, pixelSize: 7, color: ACCENT, letterSpacing, wordSpacing })
+        e(PixelPreview, { text: extText || 'Lorem ipsum', fontData, gridSize, pixelSize: 4, color: ACCENT, letterSpacing, wordSpacing })
       ),
       e(Field, { label: 'NOMBRE DEL ARCHIVO' }, e('input', { value: filename, onChange: ev => setFilename(ev.target.value), style: inputStyle, onFocus: ev => ev.target.style.borderColor = ACCENT, onBlur: ev => ev.target.style.borderColor = 'var(--border)' })),
       e(Field, { label: 'NOMBRE DE LA FAMILIA' }, e('input', { value: fontName, onChange: ev => setFontName(ev.target.value), style: inputStyle, onFocus: ev => ev.target.style.borderColor = ACCENT, onBlur: ev => ev.target.style.borderColor = 'var(--border)' })),
