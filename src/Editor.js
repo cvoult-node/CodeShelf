@@ -415,7 +415,8 @@ export function EditorPage({
   user, isDark, toggleTheme, gridSize, currentChar, fontData, grid, isSaving,
   tool, setTool, previewText, setPreviewText, onPixelDown, onPixelEnter, onMouseUp,
   onSwitchChar, onClearCanvas, onInvert, onShift, onSave, onUndo, onRedo,
-  onBack, onPublish, projectName, isPublishing, publishedOk, onResetPublish
+  onBack, onPublish, projectName, isPublishing, publishedOk, onResetPublish,
+  onSaveExtraChars, initialExtraChars
 }) {
   const [showExport,      setShowExport]      = useState(false);
   const [showPublish,     setShowPublish]     = useState(false);
@@ -534,6 +535,16 @@ export function EditorPage({
     return () => window.removeEventListener('keydown', handler);
   }, [onSave, onUndo, onRedo, onInvert, onShift, onClearCanvas, setTool]);
 
+  // Persist extra chars — guardado en Firebase mediante onSaveExtraChars prop
+  useEffect(() => {
+    if (!autosaveEnabled) return;
+    const id = setInterval(() => { onSave(); }, autosaveMinutes * 60 * 1000);
+    return () => clearInterval(id);
+  }, [autosaveEnabled, autosaveMinutes, onSave]);
+
+  // All chars for panel = TECLADO + extraChars (must be before filteredChars)
+  const allChars = useMemo(() => [...TECLADO, ...extraChars.filter(c => !TECLADO.includes(c))], [extraChars]);
+
   // Filtrado de caracteres
   const filteredChars = useMemo(() => {
     let chars = allChars;
@@ -545,20 +556,6 @@ export function EditorPage({
 
   // Reset page when filter/search changes
   useEffect(() => { setCharPage(0); }, [charSearch, charFilter]);
-
-  // Persist autosave settings
-  useEffect(() => { localStorage.setItem('cs-autosave-enabled', autosaveEnabled ? '1' : '0'); }, [autosaveEnabled]);
-  useEffect(() => { localStorage.setItem('cs-autosave-minutes', String(autosaveMinutes)); }, [autosaveMinutes]);
-
-  // Autosave interval
-  useEffect(() => {
-    if (!autosaveEnabled) return;
-    const id = setInterval(() => { onSave(); }, autosaveMinutes * 60 * 1000);
-    return () => clearInterval(id);
-  }, [autosaveEnabled, autosaveMinutes, onSave]);
-
-  // Persist extra chars
-  useEffect(() => { localStorage.setItem('cs-extra-chars', JSON.stringify(extraChars)); }, [extraChars]);
 
   // Close addChar menu on outside click
   useEffect(() => {
@@ -595,14 +592,13 @@ export function EditorPage({
   const addAllChars = () => {
     const toAdd = addCharList.map(item => item.char).filter(ch => !extraChars.includes(ch));
     if (toAdd.length === 0) return;
-    setExtraChars(prev => [...prev, ...toAdd]);
+    const next = [...extraChars, ...toAdd];
+    setExtraChars(next);
+    onSaveExtraChars?.(next);   // persiste en Firebase a través del padre
     setAddCharList([]);
     setShowAddChar(false);
     if (toAdd[0]) onSwitchChar(toAdd[0]);
   };
-
-  // All chars for panel = TECLADO + extraChars
-  const allChars = useMemo(() => [...TECLADO, ...extraChars.filter(c => !TECLADO.includes(c))], [extraChars]);
 
   const modeTools = [
     { id: 'pencil',   iconName: 'pencil',   label: 'LÁPIZ',  tooltip: 'Lápiz (P)' },
