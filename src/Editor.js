@@ -1,18 +1,11 @@
 // ─────────────────────────────────────────────
-//  EDITOR — src/Editor.js  (v2.0)
-//  Mejoras masivas respecto a v0.0.2BETA:
-//  • Zoom real del canvas (scroll o botones +/−)
-//  • Panel de caracteres con búsqueda y filtros (Todos/Listos/Vacíos)
-//  • Barra de acciones rápidas en panel izquierdo
-//  • Progreso de la fuente (barra + %)
-//  • Tooltips flotantes en todos los botones
-//  • Shortcuts de teclado documentados + nuevos (P,F,H,V, Delete, Ctrl+I, Ctrl+0)
-//  • Estado de guardado animado
-//  • Cerrar modales con Escape
-//  • Modales rediseñados con botón × y mejor layout
-//  • Panel de preferencias con sección de atajos
-//  • Toolbar con botón de borrar incorporado
-//  • Código 100% React.createElement limpio y modular
+//  EDITOR — src/Editor.js  (v2.1)
+//  Cambios v2.1:
+//  • Eliminadas acciones rápidas del panel izquierdo
+//  • Todas las guías (CAP, X-H, BASE, DESC) ahora son editables en Preferencias
+//  • Eliminado zoom — canvas fijo en 460px
+//  • Botones de herramientas: solo iconos, sin texto
+//  • Preview de exportación más grande (pixelSize: 7)
 // ─────────────────────────────────────────────
 import React, { useState, useRef, useCallback, useEffect, useMemo } from 'https://esm.sh/react@18.2.0';
 import { auth, signOut } from './firebase.js';
