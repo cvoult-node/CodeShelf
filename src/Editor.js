@@ -1,16 +1,5 @@
 // ─────────────────────────────────────────────
 //  EDITOR — src/Editor.js  (v2.4)
-//  Cambios v2.3 (mejoras de rendimiento y correcciones):
-//  • TOOLTIP_POS movido fuera de Tooltip — ya no se recrea en cada render
-//  • EXTENDED_CHARS movido fuera de EditorPage — ya no se recrea en cada render
-//  • SHORTCUTS movido fuera de PreferencesModal — ya no se recrea en cada render
-//  • DragSlider: usa computeRef para evitar re-registrar listeners globales en cada cambio de prop
-//  • useCallback aplicado a parseCharCode, addToList, removeFromList, addAllChars, onCopyGlyph, onPaste
-//  • useEffect del teclado: deps faltantes grid, clipboard, onPasteGlyph añadidas (evitaba stale closures)
-//  • 5 efectos de persistencia de guías consolidados en uno solo
-//  • 2 efectos de autosave consolidados en uno solo
-//  • canvasSize eliminado (era alias innecesario de CANVAS_BASE)
-//  Cambios v2.4 (reorganización de barra de herramientas):
 //  • Toolbar rediseñada con 5 grupos: Edición, Historial, Transformación, Movimiento, Gestión
 //  • Todos los iconos migrados a SVG inline — mismo set, mismo stroke, sin dependencia de archivos externos
 //  • Undo/Redo usan flechas curvas (ya no flechas rectas que confundían con movimiento)
@@ -782,8 +771,9 @@ export function EditorPage({
   ];
 
   // Estilos base compartidos
-  const btnBase   = { ...toolbarBase, background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--muted)' };
-  const btnActive = { ...toolbarBase, background: ACCENT, border: `1px solid ${ACCENT}`, color: '#fff', boxShadow: `0 2px 8px ${ACCENT}40` };
+  const toolbarBase = { padding: '7px', borderRadius: R_BTN, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: '34px', fontFamily: FONT_MONO, border: '1px solid var(--border)', transition: 'all .13s' };
+  const btnBase     = { ...toolbarBase, background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--muted)' };
+  const btnActive   = { ...toolbarBase, background: ACCENT, border: `1px solid ${ACCENT}`, color: '#fff', boxShadow: `0 2px 8px ${ACCENT}40` };
   const divider   = e('div', { style: { width: '1px', height: '28px', background: 'var(--border)', margin: '0 5px', flexShrink: 0 } });
 
   // Helper: botón de acción (sin estado activo)
