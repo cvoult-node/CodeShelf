@@ -134,7 +134,7 @@ const ExportModal = ({ projectName, fontData, gridSize, previewText: extText, on
   const [unitsPerEm, setUnitsPerEm] = useState(1000);
 
   // S dinámico = mismo cálculo que canvas.js — glifos llenan ~80% del em
-  const S = Math.round((unitsPerEm * 0.80) / gridSize);
+  const S = Math.round((unitsPerEm * 0.1) / gridSize);
   const baselineRow = getBaselineRow(gridSize);
   // ascender: desde baseline hasta arriba del grid, en unidades opentype
   const defaultAscender = Math.round(baselineRow * S);
