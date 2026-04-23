@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta property="og:title" content="CodeShelf — Mis Fuentes Pixel">
+  <meta property="og:description" content="Gestiona y crea tus fuentes pixel art con CodeShelf">
+  <!-- og:image: reemplaza con tu URL real -->
+  <meta property="og:type" content="website">
+  <meta name="twitter:card" content="summary_large_image">
+  <title>Codeshelf | Mis Fuentes</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Press+Start+2P&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="src/shared.css">
+  <style>
+    body {
+      overflow-y: scroll; min-height: 100vh;
+      background-image: radial-gradient(ellipse 60% 40% at 50% 0%, rgba(191,69,69,0.04) 0%, transparent 70%);
+    }
+
+    /* ── Feed layout ── */
+    .feed-container { max-width: 680px; margin: 0 auto; padding: 28px 16px 80px; }
+    .feed-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 22px; gap: 12px; }
+    .feed-header-left { display: flex; align-items: baseline; gap: 12px; }
+    .feed-title { font-family: var(--pixel); font-size: 10px; color: var(--text); letter-spacing: 2px; }
+    .feed-count { font-size: 9px; color: var(--muted); letter-spacing: 2px; }
+
+    /* ── View toggle ── */
+    .view-toggle { display: flex; gap: 4px; background: var(--surface2); border: 1px solid var(--border); border-radius: var(--r-btn); padding: 3px; }
+    .view-btn { width: 28px; height: 26px; border: none; background: none; border-radius: 5px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background .13s; }
+    .view-btn img { width: 13px; height: 13px; filter: var(--icon-filter); opacity: .4; transition: opacity .13s; }
+    .view-btn.active { background: var(--surface3); }
+    .view-btn.active img, .view-btn:hover img { opacity: .85; }
+
+    /* ── New project button ── */
+    .new-project-btn {
+      border: 1.5px dashed var(--border2); border-radius: var(--r-card);
+      padding: 16px 20px; display: flex; align-items: center; gap: 16px;
+      cursor: pointer; margin-bottom: 20px;
+      transition: border-color .18s, background .18s, transform .12s;
+      background: none; width: 100%; text-align: left; color: var(--text); font-family: var(--mono);
+    }
+    .new-project-btn:hover { border-color: var(--accent); background: var(--accent3); transform: translateY(-1px); }
+    .plus-square {
+      width: 40px; height: 40px; background: var(--accent); border-radius: var(--r-btn);
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: background .15s;
+    }
+    .plus-square img { width: 18px; height: 18px; filter: invert(1); }
+    .new-project-btn:hover .plus-square { background: var(--accent-h); }
+    .new-project-label { font-weight: 700; font-size: 13px; color: var(--text); }
+    .new-project-sub { font-size: 10px; color: var(--muted); margin-top: 4px; }
+
+    /* ── Project list ── */
+    #projects-list { display: flex; flex-direction: column; gap: 12px; }
+    #projects-list.grid-view { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+
+    /* ── Card ── */
+    .card {
+      background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-card);
+      overflow: hidden; transition: border-color .18s, transform .15s, box-shadow .18s;
+      box-shadow: var(--shadow-card);
+    }
+    .card:hover { border-color: var(--border-accent); transform: translateY(-2px); box-shadow: var(--shadow-hover); }
+    .card-top-line { height: 2px; background: linear-gradient(90deg, var(--accent), transparent); }
+    .card-inner { padding: 18px 18px 16px; }
+    .card-header { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+    .card-icon {
+      width: 38px; height: 38px; background: var(--accent2); border-radius: 50%;
+      border: 1px solid var(--border-accent); display: flex; align-items: center;
+      justify-content: center; font-family: var(--pixel); font-size: 11px; color: var(--accent); flex-shrink: 0;
+    }
+    .p-title { font-weight: 700; font-size: 13px; color: var(--text); }
+    .p-meta  { font-size: 9px; color: var(--muted); letter-spacing: 2px; margin-top: 4px; }
+
+    .card-preview {
+      background: var(--canvas-bg); border-radius: var(--r-btn); padding: 12px;
+      margin-bottom: 14px; display: flex; gap: 10px; min-height: 46px;
+      align-items: center; justify-content: center; border: 1px solid var(--border);
+    }
+
+    .card-actions { display: flex; gap: 8px; }
+    .btn-open {
+      flex: 1; background: var(--accent); color: #fff; border: none;
+      border-radius: var(--r-btn); padding: 9px; font-family: var(--mono);
+      font-weight: 700; font-size: 10px; letter-spacing: 2px; cursor: pointer;
+      transition: background .15s, transform .12s;
+    }
+    .btn-open:hover { background: var(--accent-h); transform: translateY(-1px); }
+    .btn-del {
+      width: 36px; height: 36px; background: transparent; border: 1px solid var(--border);
+      border-radius: var(--r-btn); cursor: pointer; display: flex; align-items: center;
+      justify-content: center; transition: background .15s, border-color .15s; padding: 0;
+    }
+    .btn-del img { width: 15px; height: 15px; filter: var(--icon-filter); opacity: .45; transition: opacity .15s; }
+    .btn-del:hover { background: rgba(191,69,69,0.08); border-color: var(--border-accent); }
+    .btn-del:hover img { opacity: .9; filter: none; }
+
+    #projects-list.grid-view .card-inner { padding: 14px; }
+    #projects-list.grid-view .p-title { font-size: 12px; }
+    #projects-list.grid-view .card-preview { padding: 10px; min-height: 36px; }
+
+    /* ── Empty state ── */
+    .empty-state {
+      text-align: center; padding: 70px 20px; color: var(--muted);
+      font-size: 10px; letter-spacing: 3px; grid-column: 1 / -1;
+    }
+    .empty-icon {
+      width: 48px; height: 48px; margin: 0 auto 18px; opacity: 0.25;
+      filter: var(--icon-filter);
+    }
+    .empty-title { font-family: var(--pixel); font-size: 10px; letter-spacing: 2px; margin-bottom: 10px; }
+    .empty-sub { font-size: 9px; color: var(--muted2); }
+
+    /* ── Modal ── */
+    .modal-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.55);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 999; padding: 16px; backdrop-filter: blur(8px);
+    }
+    .modal-overlay.hidden { display: none; }
+    .modal-box {
+      background: var(--surface); border: 1px solid var(--border2);
+      border-radius: var(--r-card); padding: 32px 28px; width: 100%;
+      max-width: 340px; box-shadow: 0 32px 80px rgba(0,0,0,0.25);
+    }
+    .modal-title { font-family: var(--pixel); font-size: 11px; color: var(--accent); margin-bottom: 8px; letter-spacing: 2px; }
+    .modal-subtitle { font-size: 10px; color: var(--muted); letter-spacing: 1px; margin-bottom: 24px; }
+    .modal-input {
+      width: 100%; background: var(--surface2); border: 1px solid var(--border);
+      border-radius: var(--r-btn); padding: 12px 14px; color: var(--text);
+      font-family: var(--mono); font-size: 13px; outline: none; margin-bottom: 8px;
+      transition: border-color .15s, background .15s;
+    }
+    .modal-input:focus { border-color: var(--accent); background: var(--surface3); }
+    .modal-input::placeholder { color: var(--muted2); }
+    .modal-hint { font-size: 9px; color: var(--muted2); letter-spacing: 1px; margin-bottom: 22px; }
+    .modal-actions { display: flex; gap: 8px; }
+    .btn-cancel {
+      flex: 1; background: none; border: 1px solid var(--border); border-radius: var(--r-btn);
+      color: var(--muted); font-family: var(--mono); font-size: 10px; letter-spacing: 2px;
+      padding: 11px; cursor: pointer; transition: border-color .15s, color .15s;
+    }
+    .btn-cancel:hover { border-color: var(--border2); color: var(--text); }
+    .btn-confirm {
+      flex: 2; background: var(--accent); border: none; border-radius: var(--r-btn);
+      color: #fff; font-family: var(--mono); font-weight: 700; font-size: 10px;
+      letter-spacing: 2px; padding: 11px; cursor: pointer;
+      transition: background .15s, transform .12s;
+    }
+    .btn-confirm:hover { background: var(--accent-h); transform: translateY(-1px); }
+    .btn-confirm:disabled { opacity: .45; cursor: not-allowed; transform: none; }
+
+    /* ── Grid size selector ── */
+    .modal-section-label {
+      font-size: 8px; letter-spacing: 2px; color: var(--muted);
+      font-family: var(--mono); margin: 16px 0 8px;
+    }
+    .grid-size-grid {
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 20px;
+    }
+    .grid-size-btn {
+      display: flex; flex-direction: column; align-items: center; padding: 10px 4px;
+      background: var(--surface2); border: 1px solid var(--border); border-radius: var(--r-btn);
+      cursor: pointer; font-family: var(--mono); font-size: 11px; font-weight: 700;
+      color: var(--muted); transition: all .15s; line-height: 1.4; gap: 2px;
+    }
+    .grid-size-btn span { font-size: 8px; font-weight: 400; color: var(--muted2); letter-spacing: 1px; }
+    .grid-size-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .grid-size-btn.active span { color: rgba(255,255,255,0.7); }
+    .grid-size-btn:hover:not(.active) { border-color: var(--border2); color: var(--text); background: var(--surface3); }
+
+
+    /* ── Comunidad (descargas) ── */
+    .community-section { margin-top: 30px; }
+    .community-head { display:flex; align-items:center; justify-content:space-between; margin-bottom: 12px; }
+    .community-title { font-family: var(--pixel); font-size: 9px; color: var(--text); letter-spacing: 2px; }
+    .community-sub { font-size: 9px; color: var(--muted); letter-spacing: 1px; }
+    .community-list { display: grid; gap: 10px; }
+    .community-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-btn); padding: 12px; display:flex; justify-content:space-between; align-items:center; gap: 10px; }
+    .community-name { font-size: 11px; color: var(--text); font-weight: 700; }
+    .community-meta { font-size: 9px; color: var(--muted); margin-top: 3px; }
+    .btn-download { background: var(--surface2); color: var(--text); border: 1px solid var(--border); border-radius: var(--r-btn); padding: 8px 10px; font-family: var(--mono); font-size: 9px; letter-spacing: 1px; cursor:pointer; }
+    .btn-download:hover { border-color: var(--border-accent); color: var(--accent); }
+
+    /* ── Card rename ── */
+    .card-title-row { display: flex; align-items: center; gap: 6px; }
+    .btn-edit-name {
+      background: none; border: none; padding: 2px; cursor: pointer;
+      display: flex; align-items: center; opacity: 0; transition: opacity .15s; flex-shrink: 0;
+    }
+    .card:hover .btn-edit-name, .btn-edit-name:focus { opacity: 1; }
+
+  </style>
+</head>
+<body>
+
+  <div id="screen-loading" class="loading-screen">
+    <span class="loading-text">CARGANDO...</span>
+    <div class="loading-bar"></div>
+  </div>
+
+  <div id="screen-app" class="hidden">
+    <nav class="navbar">
+      <span class="navbar-logo" style="cursor:default;">CODESHELF</span>
+      <div class="navbar-links">
+        <a href="social.html" class="nav-link">EXPLORAR</a>
+        <div class="nav-avatar-wrap">
+          <div class="nav-avatar" id="nav-avatar" tabindex="0" role="button" aria-label="Menú de usuario">U</div>
+          <div class="nav-dropdown" id="nav-dropdown">
+            <div class="dd-user">
+              <div class="dd-avatar-sm" id="dd-avatar-sm">U</div>
+              <div>
+                <div class="dd-user-name"  id="dd-user-name">—</div>
+                <div class="dd-user-email" id="dd-user-email">—</div>
+              </div>
+            </div>
+            <div class="dd-section">
+              <div class="dd-label">NAVEGAR</div>
+              <a href="social.html" class="dd-item">
+                <img class="dd-icon" src="src/icons/explore.svg" alt="">Explorar fuentes
+              </a>
+              <a href="feed.html" class="dd-item">
+                <img class="dd-icon" src="src/icons/fonts.svg" alt="">Mis fuentes
+              </a>
+            </div>
+            <div class="dd-section">
+              <div class="dd-label">CREAR</div>
+              <button class="dd-item" id="dd-new-font">
+                <img class="dd-icon" src="src/icons/plus.svg" alt="">Nueva fuente
+              </button>
+            </div>
+            <div class="dd-section">
+              <div class="dd-label">CUENTA</div>
+              <a href="profile.html" class="dd-item">
+                <img class="dd-icon" src="src/icons/user.svg" alt="">Mi perfil
+              </a>
+              <button class="dd-item" id="dd-theme">
+                <img class="dd-icon" src="src/icons/theme.svg" id="dd-theme-icon" alt="">
+                <span id="dd-theme-label">Tema oscuro</span>
+              </button>
+              <button class="dd-item" id="dd-logout" style="color:var(--accent);">
+                <img class="dd-icon" src="src/icons/logout.svg" alt="">Cerrar sesión
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </nav>
+
+    <main class="feed-container">
+      <div class="feed-header">
+        <div class="feed-header-left">
+          <span class="feed-title">MIS FUENTES</span>
+          <span class="feed-count" id="proj-count"></span>
+        </div>
+        <div class="view-toggle">
+          <button class="view-btn active" id="btn-view-list" title="Vista lista">
+            <img src="src/icons/list.svg" alt="Lista">
+          </button>
+          <button class="view-btn" id="btn-view-grid" title="Vista mosaico">
+            <img src="src/icons/grid.svg" alt="Mosaico">
+          </button>
+        </div>
+      </div>
+
+      <button class="new-project-btn" id="btn-new-font">
+        <div class="plus-square"><img src="src/icons/plus.svg" alt="Agregar"></div>
+        <div>
+          <p class="new-project-label">Nueva fuente</p>
+          <p class="new-project-sub">Crea un nuevo proyecto de pixel font</p>
+        </div>
+      </button>
+
+      <div id="projects-list"></div>
+
+      <section class="community-section">
+        <div class="community-head">
+          <span class="community-title">DESCARGAR FUENTES DE LA COMUNIDAD</span>
+          <span class="community-sub" id="community-count"></span>
+        </div>
+        <div class="community-list" id="community-list"></div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Modal nueva fuente -->
+  <div class="modal-overlay hidden" id="modal-overlay">
+    <div class="modal-box">
+      <p class="modal-title">NUEVA FUENTE</p>
+      <p class="modal-subtitle">Ponle un nombre a tu proyecto</p>
+      <input class="modal-input" type="text" id="new-font-name" placeholder="mi-fuente-pixel" maxlength="40">
+      <p class="modal-hint">Solo letras, números y guiones · Lienzo 16×16px</p>
+      <div class="modal-actions">
+        <button class="btn-cancel" id="close-modal">CANCELAR</button>
+        <button class="btn-confirm" id="confirm-create">CREAR</button>
+      </div>
+    </div>
+  </div>
+
+    <script src="src/env.js"></script>
+  <script type="module">
+    import {
+      auth, db,
+      signOut, onAuthStateChanged,
+      doc, setDoc, getDoc, getDocs, collection, query, orderBy, where, limit, deleteDoc
+    } from './src/firebase.js';
+    import { initNavbar } from './src/navbar-shared.js';
+    import { 
+      renderFeed, initFeedEvents, 
+      cargarFuentesComunidad, renderComunidad, importarFuente 
+    } from './src/Feed.js';
+
+    const show = id => document.getElementById(id).classList.remove('hidden');
+    const hide = id => document.getElementById(id).classList.add('hidden');
+
+    // ── Navbar ─────────────────────────────────────────────────────────────
+    initNavbar({ auth, db, onAuthStateChanged, doc, getDoc });
+
+    const ddLogout = document.getElementById('dd-logout');
+    if (ddLogout) ddLogout.onclick = () => signOut(auth).then(() => window.location.replace('index.html'));
+    const ddNewFont = document.getElementById('dd-new-font');
+    if (ddNewFont) ddNewFont.onclick = () => {
+      document.getElementById('modal-overlay').classList.remove('hidden');
+      document.getElementById('new-font-name').value = ''; document.getElementById('new-font-name').focus();
+    };
+
+    // ── View toggle ────────────────────────────────────────────────────────
+    let currentView = localStorage.getItem('cs-feed-view') || 'list';
+    function setView(v) {
+      currentView = v; localStorage.setItem('cs-feed-view', v);
+      const list = document.getElementById('projects-list');
+      const btnL = document.getElementById('btn-view-list');
+      const btnG = document.getElementById('btn-view-grid');
+      if (v === 'grid') { list.classList.add('grid-view'); btnG.classList.add('active'); btnL.classList.remove('active'); }
+      else              { list.classList.remove('grid-view'); btnL.classList.add('active'); btnG.classList.remove('active'); }
+    }
+    setView(currentView);
+    document.getElementById('btn-view-list').onclick = () => setView('list');
+    document.getElementById('btn-view-grid').onclick = () => setView('grid');
+
+    // ── Firestore ──────────────────────────────────────────────────────────
+    async function cargarProyectos(user) {
+      const q   = query(collection(db, 'usuarios', user.uid, 'proyectos'), orderBy('updatedAt', 'desc'));
+      const snp = await getDocs(q);
+      return snp.docs.map(d => ({ id: d.id, ...d.data() }));
+    }
+
+    function updateCount(n) {
+      const el = document.getElementById('proj-count');
+      if (el) el.textContent = `${n} PROYECTO${n !== 1 ? 'S' : ''}`;
+    }
+
+    function makeCallbacks(user) {
+      const onOpen = (proyecto) => { sessionStorage.setItem('proyectoActivo', JSON.stringify(proyecto)); window.location.href = 'editor.html'; };
+      const onDelete = async (id) => {
+        await deleteDoc(doc(db, 'usuarios', user.uid, 'proyectos', id));
+        const p = await cargarProyectos(user); renderFeed(p, onOpen, onDelete, onRename); updateCount(p.length);
+      };
+      const onRename = async (id, newName) => {
+        try {
+          await setDoc(doc(db, 'usuarios', user.uid, 'proyectos', id), { nombre: newName, updatedAt: new Date() }, { merge: true });
+        } catch(err) { console.error('Error al renombrar:', err); }
+      };
+      const onCreate = async (nombre, size) => {
+        const id = Date.now().toString();
+        await setDoc(doc(db, 'usuarios', user.uid, 'proyectos', id), { nombre, gridSize: size, font: {}, updatedAt: new Date() });
+        const p = await cargarProyectos(user); renderFeed(p, onOpen, onDelete, onRename); updateCount(p.length);
+      };
+      const onImport = async (post) => {
+        importarFuente(user, post, async () => {
+          const p = await cargarProyectos(user); renderFeed(p, onOpen, onDelete, onRename); updateCount(p.length);
+        });
+      };
+      return { onOpen, onDelete, onCreate, onRename, onImport };
+    }
+
+    // ── Auth state ─────────────────────────────────────────────────────────
+    onAuthStateChanged(auth, async (user) => {
+      hide('screen-loading');
+      if (!user) { window.location.replace('index.html'); return; }
+
+      show('screen-app');
+      const { onOpen, onDelete, onCreate, onRename, onImport } = makeCallbacks(user);
+      
+      const proyectos = await cargarProyectos(user);
+      renderFeed(proyectos, onOpen, onDelete, onRename);
+      updateCount(proyectos.length);
+      initFeedEvents(onCreate);
+
+      const fuentesComunidad = await cargarFuentesComunidad(user.uid);
+      renderComunidad(fuentesComunidad, onImport);
+    });
+
+  </script>
+</body>
+</html>

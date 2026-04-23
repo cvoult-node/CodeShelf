@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta property="og:title" content="CodeShelf — Explorar Fuentes">
+  <meta property="og:description" content="Descubre y explora fuentes pixel art creadas por la comunidad">
+  <meta property="og:type" content="website">
+  <meta name="twitter:card" content="summary_large_image">
+  <title>Codeshelf — Explorar Fuentes</title>
+  <script>(function(){var t=localStorage.getItem('cs-theme')||'light';document.documentElement.className=t;}());</script>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Press+Start+2P&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="src/shared.css">
+  <style>
+    body {
+      overflow-y: scroll;
+      background-image: radial-gradient(ellipse 70% 40% at 50% 0%, rgba(191,69,69,0.04) 0%, transparent 60%);
+    }
+    .feed-wrap { max-width: 680px; margin: 0 auto; padding: 28px 16px 64px; }
+    .feed-header { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 24px; }
+    .feed-title { font-family: var(--pixel); font-size: 10px; color: var(--text); letter-spacing: 2px; }
+    .feed-count { font-size: 9px; color: var(--muted); letter-spacing: 2px; }
+
+    /* ── Post card ── */
+    .post-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--r-card); overflow: hidden; margin-bottom: 16px;
+      transition: border-color .18s, transform .15s, box-shadow .18s;
+      cursor: pointer; box-shadow: var(--shadow-card);
+      position: relative;
+    }
+    .post-card:hover { border-color: var(--border-accent); transform: translateY(-2px); box-shadow: var(--shadow-hover); }
+    .card-accent-line { height: 2px; background: linear-gradient(90deg, var(--accent), transparent); }
+    .card-body { padding: 20px; }
+    .card-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+    .card-author { display: flex; align-items: center; gap: 12px; }
+    .author-avatar {
+      width: 32px; height: 32px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-family: var(--pixel); font-size: 8px; border: 1.5px solid; flex-shrink: 0;
+    }
+    .author-name { font-size: 12px; font-weight: 700; color: var(--text); }
+    .author-date { font-size: 9px; color: var(--muted); margin-top: 2px; letter-spacing: 1px; }
+    .card-badge {
+      font-size: 8px; letter-spacing: 2px; color: var(--accent);
+      border: 1px solid var(--border-accent); border-radius: 5px;
+      padding: 4px 8px; background: var(--accent2);
+    }
+    .card-preview {
+      background: var(--canvas-bg); border-radius: 8px; border: 1px solid var(--border);
+      padding: 16px; margin-bottom: 16px; min-height: 64px;
+      display: flex; align-items: center; overflow: hidden;
+    }
+    .card-preview canvas { image-rendering: pixelated; max-width: 100%; }
+    .card-meta-row { display: flex; align-items: center; justify-content: space-between; }
+    .font-name { font-family: var(--pixel); font-size: 10px; color: var(--text); letter-spacing: 1px; }
+    .font-stats { font-size: 9px; color: var(--muted); letter-spacing: 2px; }
+    .card-glyphs-row { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+
+    .card-footer { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
+    .btn-demo {
+      flex: 1; padding: 10px; min-width: 100px;
+      background: none; border: 1px solid var(--border); border-radius: var(--r-btn);
+      color: var(--muted); font-family: var(--mono); font-size: 9px;
+      letter-spacing: 2px; cursor: pointer;
+      transition: border-color .15s, color .15s, background .15s; text-align: center;
+    }
+    .btn-demo:hover { border-color: var(--accent); color: var(--accent); background: var(--accent3); }
+
+    /* Botón descarga — visible para todos */
+    .btn-download-font {
+      flex: 1; padding: 10px; min-width: 100px;
+      background: var(--accent); border: none; border-radius: var(--r-btn);
+      color: #fff; font-family: var(--mono); font-size: 9px;
+      letter-spacing: 2px; cursor: pointer; text-align: center;
+      transition: opacity .15s, transform .1s;
+    }
+    .btn-download-font:hover { opacity: .88; transform: translateY(-1px); }
+    .btn-download-font:active { transform: translateY(0); }
+    .btn-download-font:disabled { opacity: .5; cursor: default; transform: none; }
+
+    .btn-owner {
+      padding: 10px; background: var(--surface2); border: 1px solid var(--border);
+      border-radius: var(--r-btn); color: var(--muted); font-family: var(--mono);
+      font-size: 9px; letter-spacing: 1px; cursor: pointer; transition: all .15s;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .btn-owner:hover { border-color: var(--accent); color: var(--accent); }
+    .btn-owner.danger:hover { border-color: #e62222; color: #e62222; background: rgba(230,34,34,0.05); }
+    .btn-owner img { width: 12px; height: 12px; filter: var(--icon-filter); opacity: .6; }
+    .btn-owner:hover img { opacity: 1; filter: none; }
+
+    /* ── Edit preview modal ── */
+    .edit-overlay {
+      position: fixed; inset: 0; z-index: 900;
+      background: rgba(0,0,0,0.55); backdrop-filter: blur(6px);
+      display: flex; align-items: center; justify-content: center;
+    }
+    .edit-modal {
+      background: var(--surface); border: 1px solid var(--border2);
+      border-radius: var(--r-card); padding: 28px; width: 100%; max-width: 420px;
+      box-shadow: 0 32px 80px rgba(0,0,0,0.28);
+      display: flex; flex-direction: column; gap: 16px;
+    }
+    .edit-modal h3 {
+      margin: 0; font-family: var(--pixel); font-size: 10px;
+      color: var(--accent); letter-spacing: 2px;
+    }
+    .edit-modal label {
+      font-family: var(--mono); font-size: 9px; color: var(--muted);
+      letter-spacing: 2px; display: block; margin-bottom: 6px;
+    }
+    .edit-input {
+      width: 100%; padding: 10px 13px; box-sizing: border-box;
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: var(--r-btn); color: var(--text);
+      font-family: var(--mono); font-size: 13px; outline: none;
+      transition: border-color .15s;
+    }
+    .edit-input:focus { border-color: var(--accent); }
+    .edit-preview-box {
+      background: var(--canvas-bg); border: 1px solid var(--border);
+      border-radius: 8px; padding: 14px; min-height: 56px;
+      display: flex; align-items: center; overflow: hidden;
+    }
+    .edit-actions { display: flex; gap: 10px; }
+    .edit-cancel {
+      flex: 1; padding: 12px; background: var(--surface2);
+      border: 1px solid var(--border); border-radius: var(--r-btn);
+      color: var(--muted); font-family: var(--mono); font-size: 11px; cursor: pointer;
+    }
+    .edit-save {
+      flex: 2; padding: 12px; background: var(--accent); border: none;
+      border-radius: var(--r-btn); color: #fff; font-weight: 700;
+      font-family: var(--mono); font-size: 11px; cursor: pointer;
+      opacity: 1; transition: opacity .15s;
+    }
+    .edit-save:disabled { opacity: .55; cursor: default; }
+
+    /* ── Empty state ── */
+    .empty { text-align: center; padding: 80px 20px; color: var(--muted); }
+    .empty-icon { width: 40px; height: 40px; margin: 0 auto 18px; opacity: .2; filter: var(--icon-filter); }
+    .empty-title { font-family: var(--pixel); font-size: 10px; letter-spacing: 3px; margin-bottom: 10px; }
+    .empty-sub { font-size: 10px; color: var(--muted2); }
+  </style>
+</head>
+<body>
+
+  <div id="screen-loading" class="loading-screen">
+    <span class="loading-text">CARGANDO...</span>
+    <div class="loading-bar"></div>
+  </div>
+
+  <div id="screen-app" class="hidden" style="min-height:100vh;">
+    <nav class="navbar">
+      <a href="social.html" class="navbar-logo">CODESHELF</a>
+      <div class="navbar-links">
+        <a href="social.html" class="nav-link active">EXPLORAR</a>
+        <a href="feed.html"   class="nav-link" id="nav-feed">MIS FUENTES</a>
+        <div class="nav-avatar-wrap">
+          <div class="nav-avatar" id="nav-avatar" tabindex="0" role="button" aria-label="Menú de usuario">?</div>
+          <div class="nav-dropdown" id="nav-dropdown">
+            <div class="dd-user">
+              <div class="dd-avatar-sm" id="dd-avatar-sm">?</div>
+              <div>
+                <div class="dd-user-name"  id="dd-user-name">—</div>
+                <div class="dd-user-email" id="dd-user-email">—</div>
+              </div>
+            </div>
+            <div class="dd-section">
+              <div class="dd-label">NAVEGAR</div>
+              <a href="social.html" class="dd-item">
+                <img class="dd-icon" src="src/icons/explore.svg" alt="">Explorar fuentes
+              </a>
+              <a href="feed.html" class="dd-item">
+                <img class="dd-icon" src="src/icons/fonts.svg" alt="">Mis fuentes
+              </a>
+            </div>
+            <div class="dd-section">
+              <div class="dd-label">CUENTA</div>
+              <a href="profile.html" class="dd-item">
+                <img class="dd-icon" src="src/icons/user.svg" alt="">Mi perfil
+              </a>
+              <button class="dd-item" id="dd-theme">
+                <img class="dd-icon" src="src/icons/theme.svg" id="dd-theme-icon" alt="">
+                <span id="dd-theme-label">Tema oscuro</span>
+              </button>
+              <button class="dd-item danger" id="dd-logout">
+                <img class="dd-icon" src="src/icons/logout.svg" alt="">Cerrar sesión
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </nav>
+
+    <main class="feed-wrap">
+      <div class="feed-header">
+        <span class="feed-title">FUENTES PUBLICADAS</span>
+        <span class="feed-count" id="post-count"></span>
+      </div>
+      <div id="posts-list"></div>
+    </main>
+  </div>
+
+  <!-- Modal para editar preview de publicación (solo propietario) -->
+  <div id="edit-overlay" class="edit-overlay hidden" style="z-index:900;">
+    <div class="edit-modal">
+      <h3>EDITAR PUBLICACIÓN</h3>
+      <div>
+        <label>TEXTO DE PREVIEW</label>
+        <input id="edit-preview-input" class="edit-input" type="text" maxlength="40" placeholder="HELLO WORLD">
+      </div>
+      <div>
+        <label>VISTA PREVIA</label>
+        <div class="edit-preview-box" id="edit-preview-canvas-wrap"></div>
+      </div>
+      <div class="edit-actions">
+        <button class="edit-cancel" id="edit-cancel">CANCELAR</button>
+        <button class="edit-save"   id="edit-save">GUARDAR CAMBIOS</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="src/env.js"></script>
+  <script type="module">
+    import { auth, db, onAuthStateChanged, signOut, deleteDoc, doc, getDoc } from './src/firebase.js';
+    import { setDoc } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+    import { collection, query, orderBy, limit, getDocs } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+    import { createTextCanvas, createGlyphGrid, countGlyphs, availableChars } from './src/pixelRenderer.js';
+    import { deletePost } from './src/publish.js';
+    import opentype from 'https://esm.sh/opentype.js';
+    import { buildAndDownload } from './src/canvas.js';
+
+    // Hacemos opentype disponible para buildAndDownload
+    window.__opentype__ = opentype;
+
+    const hide = id => document.getElementById(id).classList.add('hidden');
+    const show = id => document.getElementById(id).classList.remove('hidden');
+
+    let currentUser = null;
+
+    // ── Theme ──────────────────────────────────
+    function getTheme() { return localStorage.getItem('cs-theme') || 'light'; }
+    function applyTheme(t) {
+      document.documentElement.className = t;
+      localStorage.setItem('cs-theme', t);
+      const lbl = document.getElementById('dd-theme-label');
+      if (lbl) lbl.textContent = t === 'dark' ? 'Tema claro' : 'Tema oscuro';
+    }
+    applyTheme(getTheme());
+    document.getElementById('dd-theme').onclick = () => {
+      applyTheme(document.documentElement.className === 'dark' ? 'light' : 'dark');
+      closeDropdown();
+    };
+    document.getElementById('dd-logout').onclick = () =>
+      signOut(auth).then(() => window.location.replace('index.html'));
+
+    // ── Dropdown ───────────────────────────────
+    const avatarBtn = document.getElementById('nav-avatar');
+    const dropdown  = document.getElementById('nav-dropdown');
+    const openDropdown  = () => { dropdown.classList.add('open'); avatarBtn.classList.add('open'); };
+    const closeDropdown = () => { dropdown.classList.remove('open'); avatarBtn.classList.remove('open'); };
+    avatarBtn.onclick = e => { e.stopPropagation(); dropdown.classList.contains('open') ? closeDropdown() : openDropdown(); };
+    document.addEventListener('click',   e => { if (!dropdown.contains(e.target) && e.target !== avatarBtn) closeDropdown(); });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeDropdown(); closeEditModal(); } });
+
+    // ── Helpers ────────────────────────────────
+    const AVATAR_COLORS = ['#bf4545','#4575bf','#45bf78','#bf9045','#8045bf','#45b8bf'];
+    function avatarColor(str) {
+      let h = 0;
+      for (const c of (str||'?')) h = (h * 31 + c.charCodeAt(0)) & 0xffffffff;
+      return AVATAR_COLORS[Math.abs(h) % AVATAR_COLORS.length];
+    }
+
+    function formatDate(ts) {
+      if (!ts) return '';
+      const d = ts.toDate ? ts.toDate() : new Date(ts);
+      return d.toLocaleDateString('es-ES', { day:'numeric', month:'short', year:'numeric' });
+    }
+
+    // ── Descarga de fuente (disponible para TODOS) ──────────────
+    function downloadFont(post, btn) {
+      if (!window.__opentype__) { alert('La librería de fuentes no está lista.'); return; }
+      const hasGlyphs = post.font && Object.values(post.font).some(g => Array.isArray(g) && g.some(Boolean));
+      if (!hasGlyphs) { alert('Esta fuente no tiene glifos dibujados.'); return; }
+
+      btn.disabled = true;
+      btn.textContent = '...';
+      try {
+        buildAndDownload(
+          post.font,
+          post.gridSize || 12,
+          (post.fontNombre || 'codeshelf-font').replace(/\s+/g, '-').toLowerCase(),
+          'otf',
+          {
+            fontName: post.fontNombre || 'CodeShelf Font',
+            author:   post.autorNombre || post.autorEmail || '',
+            letterSpacing: 0,
+            wordSpacing: 10,
+            extraSpace: 1,
+            unitsPerEm: 1000,
+            ascender: 800,
+            descender: -250
+          }
+        );
+      } catch (err) {
+        alert('Error al descargar: ' + (err.message || err));
+      } finally {
+        setTimeout(() => { btn.disabled = false; btn.textContent = '⬇ DESCARGAR OTF'; }, 1200);
+      }
+    }
+
+    // ── Modal edición de publicación (solo propietario) ─────────
+    let editingPost = null;
+    let editPreviewDebounce = null;
+
+    function openEditModal(post) {
+      editingPost = post;
+      const input = document.getElementById('edit-preview-input');
+      input.value = post.previewText || 'HELLO';
+      renderEditPreview(post, input.value);
+      show('edit-overlay');
+
+      input.oninput = () => {
+        clearTimeout(editPreviewDebounce);
+        editPreviewDebounce = setTimeout(() => renderEditPreview(post, input.value), 150);
+      };
+    }
+
+    function closeEditModal() {
+      hide('edit-overlay');
+      editingPost = null;
+      document.getElementById('edit-preview-canvas-wrap').innerHTML = '';
+    }
+
+    function renderEditPreview(post, text) {
+      const wrap = document.getElementById('edit-preview-canvas-wrap');
+      wrap.innerHTML = '';
+      try {
+        const canvas = createTextCanvas(text || 'HELLO', post.font || {}, post.gridSize || 12, {
+          pixelSize: 4, color: '#bf4545', letterSpacing: 2, paddingX: 12, paddingY: 8
+        });
+        wrap.appendChild(canvas);
+      } catch(e) {}
+    }
+
+    document.getElementById('edit-cancel').onclick = closeEditModal;
+    document.getElementById('edit-overlay').onclick = e => {
+      if (e.target === document.getElementById('edit-overlay')) closeEditModal();
+    };
+
+    document.getElementById('edit-save').onclick = async () => {
+      if (!editingPost) return;
+      const input   = document.getElementById('edit-preview-input');
+      const saveBtn = document.getElementById('edit-save');
+      const newText = input.value.trim() || 'HELLO';
+
+      saveBtn.disabled = true;
+      saveBtn.textContent = 'GUARDANDO...';
+      try {
+        await setDoc(
+          doc(db, 'posts', editingPost.id),
+          { previewText: newText },
+          { merge: true }
+        );
+        // Actualizar la card en el DOM sin recargar
+        const previewEl = document.getElementById(`preview-${editingPost.id}`);
+        if (previewEl) {
+          previewEl.innerHTML = '';
+          const canvas = createTextCanvas(newText, editingPost.font || {}, editingPost.gridSize || 12, {
+            pixelSize: 4, color: '#bf4545', letterSpacing: 2, paddingX: 16, paddingY: 12
+          });
+          previewEl.appendChild(canvas);
+        }
+        editingPost.previewText = newText;
+        closeEditModal();
+      } catch (err) {
+        console.error(err);
+        alert('Error al guardar los cambios.');
+      } finally {
+        saveBtn.disabled = false;
+        saveBtn.textContent = 'GUARDAR CAMBIOS';
+      }
+    };
+
+    // ── Cargar posts ────────────────────────────
+    async function loadPosts() {
+      const q   = query(collection(db, 'posts'), orderBy('publishedAt', 'desc'), limit(40));
+      const snp = await getDocs(q);
+      return snp.docs.map(d => ({ id: d.id, ...d.data() }));
+    }
+
+    // ── Renderizar cards ────────────────────────
+    function renderPosts(posts) {
+      const list = document.getElementById('posts-list');
+      list.innerHTML = '';
+      document.getElementById('post-count').textContent =
+        `${posts.length} FUENTE${posts.length !== 1 ? 'S' : ''}`;
+
+      if (!posts.length) {
+        list.innerHTML = `
+          <div class="empty">
+            <img class="empty-icon" src="src/icons/pencil.svg" alt="">
+            <div class="empty-title">SIN PUBLICACIONES AÚN</div>
+            <p class="empty-sub">Sé el primero en publicar tu fuente pixel</p>
+          </div>`;
+        return;
+      }
+
+      posts.forEach(post => {
+        const card       = document.createElement('div');
+        card.className   = 'post-card';
+        const glyphCount = countGlyphs(post.font);
+        const chars      = availableChars(post.font);
+        const initial    = (post.autorNombre || post.autorEmail || '?')[0].toUpperCase();
+        const bgCol      = avatarColor(post.uid);
+        const isOwner    = currentUser && currentUser.uid === post.uid;
+        const gs         = post.gridSize || 12;
+
+        const canvas = createTextCanvas(post.previewText || 'HELLO', post.font || {}, gs, {
+          pixelSize: 4, color: '#bf4545', letterSpacing: 2, paddingX: 16, paddingY: 12
+        });
+
+        // Botones de propietario
+        const ownerButtons = isOwner ? `
+          <button class="btn-owner btn-edit-pub" title="Editar texto de preview">
+            <img src="src/icons/edit.svg" alt=""> EDITAR
+          </button>
+          <button class="btn-owner btn-open-editor" title="Editar en el editor">
+            <img src="src/icons/pencil.svg" alt=""> EDITOR
+          </button>
+          <button class="btn-owner danger btn-delete" title="Eliminar publicación">
+            <img src="src/icons/delete.svg" alt=""> BORRAR
+          </button>
+        ` : '';
+
+        card.innerHTML = `
+          <div class="card-accent-line"></div>
+          <div class="card-body">
+            <div class="card-top">
+              <div class="card-author">
+                <div class="author-avatar"
+                     style="background:${bgCol}18;border-color:${bgCol}80;color:${bgCol};">
+                  ${initial}
+                </div>
+                <div>
+                  <div class="author-name">${post.autorNombre || post.autorEmail || 'Anónimo'}</div>
+                  <div class="author-date">${formatDate(post.publishedAt)}</div>
+                </div>
+              </div>
+              <div class="card-badge">${gs}PX</div>
+            </div>
+            <div class="card-preview" id="preview-${post.id}"></div>
+            <div class="card-meta-row">
+              <span class="font-name">${post.fontNombre || 'Sin nombre'}</span>
+              <span class="font-stats">${glyphCount} GLIFOS</span>
+            </div>
+            <div class="card-glyphs-row" id="glyphs-${post.id}"></div>
+            <div class="card-footer">
+              <button class="btn-demo">VER DEMO</button>
+              <button class="btn-download-font">⬇ DESCARGAR OTF</button>
+              ${ownerButtons}
+            </div>
+          </div>`;
+
+        // Insertar canvas de preview
+        card.querySelector(`#preview-${post.id}`).appendChild(canvas);
+
+        // Mini glifos
+        const glyphsRow = card.querySelector(`#glyphs-${post.id}`);
+        chars.slice(0, 20).forEach(ch => {
+          const g    = createGlyphGrid(post.font[ch], gs, 2, '#bf4545');
+          const wrap = document.createElement('div');
+          wrap.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:3px;';
+          const label = document.createElement('span');
+          label.textContent = ch;
+          label.style.cssText = 'font-size:8px;color:var(--muted);font-family:var(--mono);';
+          wrap.appendChild(g); wrap.appendChild(label);
+          glyphsRow.appendChild(wrap);
+        });
+
+        // Botón demo
+        const toDemo = () => {
+          sessionStorage.setItem('demoPost', JSON.stringify(post));
+          window.location.href = 'font-demo.html';
+        };
+        card.querySelector('.btn-demo').onclick = e => { e.stopPropagation(); toDemo(); };
+
+        // ── Botón DESCARGAR (todos los usuarios) ──
+        const dlBtn = card.querySelector('.btn-download-font');
+        dlBtn.onclick = e => { e.stopPropagation(); downloadFont(post, dlBtn); };
+
+        // ── Botones de propietario ──
+        if (isOwner) {
+          // Editar preview text de la publicación
+          card.querySelector('.btn-edit-pub').onclick = e => {
+            e.stopPropagation();
+            openEditModal(post);
+          };
+
+          // Abrir en el editor (editar el proyecto fuente)
+          card.querySelector('.btn-open-editor').onclick = async e => {
+            e.stopPropagation();
+            try {
+              const projSnap = await getDoc(doc(db, 'usuarios', currentUser.uid, 'proyectos', post.proyectoId));
+              if (projSnap.exists()) {
+                sessionStorage.setItem('proyectoActivo', JSON.stringify({ id: post.proyectoId, ...projSnap.data() }));
+                window.location.href = 'editor.html';
+              } else {
+                alert('No se encontró el proyecto original.');
+              }
+            } catch (err) {
+              console.error(err);
+              alert('Error al cargar el proyecto.');
+            }
+          };
+
+          // Eliminar publicación
+          card.querySelector('.btn-delete').onclick = async e => {
+            e.stopPropagation();
+            const doDelete = async () => {
+              try {
+                await deletePost(post.id);
+                card.remove();
+                const countEl = document.getElementById('post-count');
+                const n = parseInt(countEl.textContent) - 1;
+                countEl.textContent = `${n} FUENTE${n !== 1 ? 'S' : ''}`;
+              } catch (err) {
+                console.error(err);
+                alert('Error al eliminar la publicación.');
+              }
+            };
+            if (window.csConfirm) {
+              window.csConfirm('¿Eliminar esta publicación? El proyecto original no se borrará.', doDelete);
+            } else if (confirm('¿Eliminar esta publicación? El proyecto original no se borrará.')) {
+              doDelete();
+            }
+          };
+        }
+
+        card.onclick = toDemo;
+        list.appendChild(card);
+      });
+    }
+
+    // ── Auth + carga ────────────────────────────
+    onAuthStateChanged(auth, async (user) => {
+      hide('screen-loading');
+      show('screen-app');
+      currentUser = user;
+
+      if (user) {
+        try {
+          const perfil = await getDoc(doc(db, 'usuarios', user.uid, 'config', 'perfil'));
+          const d = perfil.exists() ? perfil.data() : {};
+          const nombre = d.displayName || user.email || '?';
+          const ini = nombre[0].toUpperCase();
+          document.getElementById('nav-avatar').textContent   = ini;
+          document.getElementById('dd-avatar-sm').textContent = ini;
+          document.getElementById('dd-user-name').textContent  = nombre;
+          document.getElementById('dd-user-email').textContent = user.email || '';
+          if (d.avatarColor) {
+            const av = document.getElementById('nav-avatar');
+            av.style.borderColor = d.avatarColor;
+            av.style.color = d.avatarColor;
+            av.style.background = d.avatarColor + '20';
+          }
+        } catch {
+          const ini = (user.email || '?')[0].toUpperCase();
+          document.getElementById('nav-avatar').textContent   = ini;
+          document.getElementById('dd-user-email').textContent = user.email || '';
+        }
+      } else {
+        const logout = document.getElementById('dd-logout');
+        if (logout) logout.style.display = 'none';
+      }
+
+      const posts = await loadPosts();
+      renderPosts(posts);
+    });
+  </script>
+</body>
+</html>
